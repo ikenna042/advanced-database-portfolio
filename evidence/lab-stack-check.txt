@@ -1,0 +1,17 @@
+== Containers ==
+SERVICE    IMAGE                STATUS
+mongo      mongo:7.0            Up 13 seconds (healthy)
+postgres   postgres:16-alpine   Up 13 seconds (healthy)
+redis      redis:7-alpine       Up 13 seconds (healthy)
+
+== PostgreSQL ==
+PostgreSQL 16.15 on aarch64-unknown-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+pg_stat_statements 1.10
+track_io_timing = on
+
+== MongoDB ==
+MongoDB 7.0.45, ping ok = 1
+
+== Redis ==
+redis_version:7.4.12
+PONG
