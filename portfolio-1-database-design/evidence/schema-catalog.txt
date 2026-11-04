@@ -1,0 +1,226 @@
+== Tables and columns ==
+     table_name      | pos |       column_name       |        data_type         | nullable 
+---------------------+-----+-------------------------+--------------------------+----------
+ audit_log           |   1 | audit_id                | bigint                   | NO
+ audit_log           |   2 | actor_staff_id          | bigint                   | YES
+ audit_log           |   3 | action                  | text                     | NO
+ audit_log           |   4 | entity_type             | text                     | NO
+ audit_log           |   5 | entity_id               | bigint                   | NO
+ audit_log           |   6 | details                 | jsonb                    | NO
+ audit_log           |   7 | created_at              | timestamp with time zone | NO
+ banks               |   1 | bank_code               | character                | NO
+ banks               |   2 | bank_name               | text                     | NO
+ customers           |   1 | customer_id             | bigint                   | NO
+ customers           |   2 | full_name               | text                     | NO
+ customers           |   3 | email                   | text                     | NO
+ customers           |   4 | phone                   | text                     | NO
+ customers           |   5 | date_of_birth           | date                     | NO
+ customers           |   6 | status                  | text                     | NO
+ customers           |   7 | created_at              | timestamp with time zone | NO
+ deposits            |   1 | deposit_id              | bigint                   | NO
+ deposits            |   2 | wallet_id               | bigint                   | NO
+ deposits            |   3 | amount_kobo             | bigint                   | NO
+ deposits            |   4 | channel                 | text                     | NO
+ deposits            |   5 | external_reference      | text                     | NO
+ deposits            |   6 | status                  | text                     | NO
+ deposits            |   7 | transaction_id          | bigint                   | YES
+ deposits            |   8 | created_at              | timestamp with time zone | NO
+ idempotency_keys    |   1 | customer_id             | bigint                   | NO
+ idempotency_keys    |   2 | idempotency_key         | text                     | NO
+ idempotency_keys    |   3 | request_hash            | text                     | NO
+ idempotency_keys    |   4 | transaction_id          | bigint                   | YES
+ idempotency_keys    |   5 | created_at              | timestamp with time zone | NO
+ kyc_documents       |   1 | document_id             | bigint                   | NO
+ kyc_documents       |   2 | customer_id             | bigint                   | NO
+ kyc_documents       |   3 | document_type           | text                     | NO
+ kyc_documents       |   4 | document_number         | text                     | NO
+ kyc_documents       |   5 | created_at              | timestamp with time zone | NO
+ kyc_reviews         |   1 | review_id               | bigint                   | NO
+ kyc_reviews         |   2 | document_id             | bigint                   | NO
+ kyc_reviews         |   3 | tier                    | smallint                 | NO
+ kyc_reviews         |   4 | status                  | text                     | NO
+ kyc_reviews         |   5 | reviewed_by             | bigint                   | YES
+ kyc_reviews         |   6 | submitted_at            | timestamp with time zone | NO
+ kyc_reviews         |   7 | reviewed_at             | timestamp with time zone | YES
+ kyc_tiers           |   1 | tier                    | smallint                 | NO
+ kyc_tiers           |   2 | daily_limit_kobo        | bigint                   | NO
+ kyc_tiers           |   3 | max_balance_kobo        | bigint                   | YES
+ ledger_entries      |   1 | entry_id                | bigint                   | NO
+ ledger_entries      |   2 | transaction_id          | bigint                   | NO
+ ledger_entries      |   3 | wallet_id               | bigint                   | NO
+ ledger_entries      |   4 | amount_kobo             | bigint                   | NO
+ ledger_entries      |   5 | created_at              | timestamp with time zone | NO
+ ledger_transactions |   1 | transaction_id          | bigint                   | NO
+ ledger_transactions |   2 | txn_type                | text                     | NO
+ ledger_transactions |   3 | narration               | text                     | NO
+ ledger_transactions |   4 | created_at              | timestamp with time zone | NO
+ merchants           |   1 | merchant_id             | bigint                   | NO
+ merchants           |   2 | business_name           | text                     | NO
+ merchants           |   3 | rc_number               | text                     | NO
+ merchants           |   4 | category                | text                     | NO
+ merchants           |   5 | status                  | text                     | NO
+ merchants           |   6 | created_at              | timestamp with time zone | NO
+ reversals           |   1 | reversal_id             | bigint                   | NO
+ reversals           |   2 | original_transaction_id | bigint                   | NO
+ reversals           |   3 | reversal_transaction_id | bigint                   | NO
+ reversals           |   4 | reason                  | text                     | NO
+ reversals           |   5 | requested_by            | bigint                   | NO
+ reversals           |   6 | approved_by             | bigint                   | NO
+ reversals           |   7 | created_at              | timestamp with time zone | NO
+ staff               |   1 | staff_id                | bigint                   | NO
+ staff               |   2 | full_name               | text                     | NO
+ staff               |   3 | email                   | text                     | NO
+ staff               |   4 | role                    | text                     | NO
+ staff               |   5 | is_active               | boolean                  | NO
+ staff               |   6 | created_at              | timestamp with time zone | NO
+ transfers           |   1 | transfer_id             | bigint                   | NO
+ transfers           |   2 | source_wallet_id        | bigint                   | NO
+ transfers           |   3 | destination_wallet_id   | bigint                   | NO
+ transfers           |   4 | amount_kobo             | bigint                   | NO
+ transfers           |   5 | status                  | text                     | NO
+ transfers           |   6 | failure_reason          | text                     | YES
+ transfers           |   7 | transaction_id          | bigint                   | YES
+ transfers           |   8 | created_at              | timestamp with time zone | NO
+ wallets             |   1 | wallet_id               | bigint                   | NO
+ wallets             |   2 | wallet_number           | character                | NO
+ wallets             |   3 | wallet_type             | text                     | NO
+ wallets             |   4 | customer_id             | bigint                   | YES
+ wallets             |   5 | merchant_id             | bigint                   | YES
+ wallets             |   6 | system_code             | text                     | YES
+ wallets             |   7 | currency                | character                | NO
+ wallets             |   8 | balance_kobo            | bigint                   | NO
+ wallets             |   9 | status                  | text                     | NO
+ wallets             |  10 | version                 | bigint                   | NO
+ wallets             |  11 | opened_at               | timestamp with time zone | NO
+ withdrawals         |   1 | withdrawal_id           | bigint                   | NO
+ withdrawals         |   2 | wallet_id               | bigint                   | NO
+ withdrawals         |   3 | amount_kobo             | bigint                   | NO
+ withdrawals         |   4 | bank_code               | character                | NO
+ withdrawals         |   5 | bank_account_number     | character                | NO
+ withdrawals         |   6 | status                  | text                     | NO
+ withdrawals         |   7 | transaction_id          | bigint                   | YES
+ withdrawals         |   8 | created_at              | timestamp with time zone | NO
+(99 rows)
+
+== Constraints ==
+     table_name      |    type     |                 constraint_name                 |                                                                                                                                                                                  definition                                                                                                                                                                                  
+---------------------+-------------+-------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ audit_log           | FOREIGN KEY | audit_log_actor_staff_id_fkey                   | FOREIGN KEY (actor_staff_id) REFERENCES staff(staff_id)
+ audit_log           | PRIMARY KEY | audit_log_pkey                                  | PRIMARY KEY (audit_id)
+ banks               | CHECK       | banks_bank_code_check                           | CHECK ((bank_code ~ '^[0-9]{3}$'::text))
+ banks               | PRIMARY KEY | banks_pkey                                      | PRIMARY KEY (bank_code)
+ banks               | UNIQUE      | banks_bank_name_key                             | UNIQUE (bank_name)
+ customers           | CHECK       | customers_date_of_birth_check                   | CHECK ((date_of_birth >= '1900-01-01'::date))
+ customers           | CHECK       | customers_email_check                           | CHECK ((email ~~ '%_@_%'::text))
+ customers           | CHECK       | customers_full_name_check                       | CHECK ((length(TRIM(BOTH FROM full_name)) > 0))
+ customers           | CHECK       | customers_phone_check                           | CHECK ((phone ~ '^\+234[0-9]{10}$'::text))
+ customers           | CHECK       | customers_status_check                          | CHECK ((status = ANY (ARRAY['active'::text, 'suspended'::text, 'closed'::text])))
+ customers           | PRIMARY KEY | customers_pkey                                  | PRIMARY KEY (customer_id)
+ customers           | UNIQUE      | customers_phone_key                             | UNIQUE (phone)
+ deposits            | CHECK       | deposit_posted_when_completed                   | CHECK (((status = 'completed'::text) = (transaction_id IS NOT NULL)))
+ deposits            | CHECK       | deposits_amount_kobo_check                      | CHECK ((amount_kobo > 0))
+ deposits            | CHECK       | deposits_channel_check                          | CHECK ((channel = ANY (ARRAY['bank_transfer'::text, 'card'::text, 'ussd'::text])))
+ deposits            | CHECK       | deposits_status_check                           | CHECK ((status = ANY (ARRAY['pending'::text, 'completed'::text, 'failed'::text])))
+ deposits            | FOREIGN KEY | deposits_transaction_id_fkey                    | FOREIGN KEY (transaction_id) REFERENCES ledger_transactions(transaction_id)
+ deposits            | FOREIGN KEY | deposits_wallet_id_fkey                         | FOREIGN KEY (wallet_id) REFERENCES wallets(wallet_id)
+ deposits            | PRIMARY KEY | deposits_pkey                                   | PRIMARY KEY (deposit_id)
+ deposits            | UNIQUE      | deposits_external_reference_key                 | UNIQUE (external_reference)
+ deposits            | UNIQUE      | deposits_transaction_id_key                     | UNIQUE (transaction_id)
+ idempotency_keys    | FOREIGN KEY | idempotency_keys_customer_id_fkey               | FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+ idempotency_keys    | FOREIGN KEY | idempotency_keys_transaction_id_fkey            | FOREIGN KEY (transaction_id) REFERENCES ledger_transactions(transaction_id)
+ idempotency_keys    | PRIMARY KEY | idempotency_keys_pkey                           | PRIMARY KEY (customer_id, idempotency_key)
+ kyc_documents       | CHECK       | kyc_documents_document_type_check               | CHECK ((document_type = ANY (ARRAY['bvn'::text, 'nin'::text, 'passport'::text, 'drivers_licence'::text])))
+ kyc_documents       | FOREIGN KEY | kyc_documents_customer_id_fkey                  | FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+ kyc_documents       | PRIMARY KEY | kyc_documents_pkey                              | PRIMARY KEY (document_id)
+ kyc_documents       | UNIQUE      | kyc_documents_document_type_document_number_key | UNIQUE (document_type, document_number)
+ kyc_reviews         | CHECK       | kyc_review_outcome_recorded                     | CHECK ((((status = 'pending'::text) AND (reviewed_by IS NULL) AND (reviewed_at IS NULL)) OR ((status <> 'pending'::text) AND (reviewed_by IS NOT NULL) AND (reviewed_at IS NOT NULL))))
+ kyc_reviews         | CHECK       | kyc_reviews_status_check                        | CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])))
+ kyc_reviews         | FOREIGN KEY | kyc_reviews_document_id_fkey                    | FOREIGN KEY (document_id) REFERENCES kyc_documents(document_id)
+ kyc_reviews         | FOREIGN KEY | kyc_reviews_reviewed_by_fkey                    | FOREIGN KEY (reviewed_by) REFERENCES staff(staff_id)
+ kyc_reviews         | FOREIGN KEY | kyc_reviews_tier_fkey                           | FOREIGN KEY (tier) REFERENCES kyc_tiers(tier)
+ kyc_reviews         | PRIMARY KEY | kyc_reviews_pkey                                | PRIMARY KEY (review_id)
+ kyc_tiers           | CHECK       | kyc_tiers_daily_limit_kobo_check                | CHECK ((daily_limit_kobo > 0))
+ kyc_tiers           | CHECK       | kyc_tiers_max_balance_kobo_check                | CHECK ((max_balance_kobo > 0))
+ kyc_tiers           | CHECK       | kyc_tiers_tier_check                            | CHECK (((tier >= 1) AND (tier <= 3)))
+ kyc_tiers           | PRIMARY KEY | kyc_tiers_pkey                                  | PRIMARY KEY (tier)
+ ledger_entries      | CHECK       | ledger_entries_amount_kobo_check                | CHECK ((amount_kobo <> 0))
+ ledger_entries      | FOREIGN KEY | ledger_entries_transaction_id_fkey              | FOREIGN KEY (transaction_id) REFERENCES ledger_transactions(transaction_id)
+ ledger_entries      | FOREIGN KEY | ledger_entries_wallet_id_fkey                   | FOREIGN KEY (wallet_id) REFERENCES wallets(wallet_id)
+ ledger_entries      | PRIMARY KEY | ledger_entries_pkey                             | PRIMARY KEY (entry_id)
+ ledger_entries      | TRIGGER     | ledger_entries_balanced                         | TRIGGER DEFERRABLE INITIALLY DEFERRED
+ ledger_entries      | UNIQUE      | ledger_entries_transaction_id_wallet_id_key     | UNIQUE (transaction_id, wallet_id)
+ ledger_transactions | CHECK       | ledger_transactions_txn_type_check              | CHECK ((txn_type = ANY (ARRAY['deposit'::text, 'withdrawal'::text, 'transfer'::text, 'reversal'::text])))
+ ledger_transactions | PRIMARY KEY | ledger_transactions_pkey                        | PRIMARY KEY (transaction_id)
+ ledger_transactions | TRIGGER     | ledger_transactions_balanced                    | TRIGGER DEFERRABLE INITIALLY DEFERRED
+ merchants           | CHECK       | merchants_status_check                          | CHECK ((status = ANY (ARRAY['active'::text, 'suspended'::text, 'closed'::text])))
+ merchants           | PRIMARY KEY | merchants_pkey                                  | PRIMARY KEY (merchant_id)
+ merchants           | UNIQUE      | merchants_rc_number_key                         | UNIQUE (rc_number)
+ reversals           | CHECK       | reversal_is_a_different_transaction             | CHECK ((original_transaction_id <> reversal_transaction_id))
+ reversals           | CHECK       | reversal_needs_two_people                       | CHECK ((requested_by <> approved_by))
+ reversals           | FOREIGN KEY | reversals_approved_by_fkey                      | FOREIGN KEY (approved_by) REFERENCES staff(staff_id)
+ reversals           | FOREIGN KEY | reversals_original_transaction_id_fkey          | FOREIGN KEY (original_transaction_id) REFERENCES ledger_transactions(transaction_id)
+ reversals           | FOREIGN KEY | reversals_requested_by_fkey                     | FOREIGN KEY (requested_by) REFERENCES staff(staff_id)
+ reversals           | FOREIGN KEY | reversals_reversal_transaction_id_fkey          | FOREIGN KEY (reversal_transaction_id) REFERENCES ledger_transactions(transaction_id)
+ reversals           | PRIMARY KEY | reversals_pkey                                  | PRIMARY KEY (reversal_id)
+ reversals           | TRIGGER     | reversals_mirror_original                       | TRIGGER DEFERRABLE INITIALLY DEFERRED
+ reversals           | UNIQUE      | reversals_original_transaction_id_key           | UNIQUE (original_transaction_id)
+ reversals           | UNIQUE      | reversals_reversal_transaction_id_key           | UNIQUE (reversal_transaction_id)
+ staff               | CHECK       | staff_role_check                                | CHECK ((role = ANY (ARRAY['support'::text, 'compliance'::text, 'finance'::text, 'auditor'::text])))
+ staff               | PRIMARY KEY | staff_pkey                                      | PRIMARY KEY (staff_id)
+ transfers           | CHECK       | transfer_failure_has_reason                     | CHECK (((status = 'failed'::text) = (failure_reason IS NOT NULL)))
+ transfers           | CHECK       | transfer_not_to_self                            | CHECK ((source_wallet_id <> destination_wallet_id))
+ transfers           | CHECK       | transfer_posted_when_completed                  | CHECK (((status = ANY (ARRAY['completed'::text, 'reversed'::text])) = (transaction_id IS NOT NULL)))
+ transfers           | CHECK       | transfers_amount_kobo_check                     | CHECK ((amount_kobo > 0))
+ transfers           | CHECK       | transfers_status_check                          | CHECK ((status = ANY (ARRAY['pending'::text, 'completed'::text, 'failed'::text, 'reversed'::text])))
+ transfers           | FOREIGN KEY | transfers_destination_wallet_id_fkey            | FOREIGN KEY (destination_wallet_id) REFERENCES wallets(wallet_id)
+ transfers           | FOREIGN KEY | transfers_source_wallet_id_fkey                 | FOREIGN KEY (source_wallet_id) REFERENCES wallets(wallet_id)
+ transfers           | FOREIGN KEY | transfers_transaction_id_fkey                   | FOREIGN KEY (transaction_id) REFERENCES ledger_transactions(transaction_id)
+ transfers           | PRIMARY KEY | transfers_pkey                                  | PRIMARY KEY (transfer_id)
+ transfers           | UNIQUE      | transfers_transaction_id_key                    | UNIQUE (transaction_id)
+ wallets             | CHECK       | wallet_balance_not_negative                     | CHECK (((wallet_type = 'system'::text) OR (balance_kobo >= 0)))
+ wallets             | CHECK       | wallet_has_exactly_one_owner                    | CHECK ((((wallet_type = 'customer'::text) AND (customer_id IS NOT NULL) AND (merchant_id IS NULL) AND (system_code IS NULL)) OR ((wallet_type = 'merchant'::text) AND (merchant_id IS NOT NULL) AND (customer_id IS NULL) AND (system_code IS NULL)) OR ((wallet_type = 'system'::text) AND (system_code IS NOT NULL) AND (customer_id IS NULL) AND (merchant_id IS NULL))))
+ wallets             | CHECK       | wallets_currency_check                          | CHECK ((currency = 'NGN'::bpchar))
+ wallets             | CHECK       | wallets_status_check                            | CHECK ((status = ANY (ARRAY['active'::text, 'frozen'::text, 'closed'::text])))
+ wallets             | CHECK       | wallets_wallet_number_check                     | CHECK ((wallet_number ~ '^[0-9]{10}$'::text))
+ wallets             | CHECK       | wallets_wallet_type_check                       | CHECK ((wallet_type = ANY (ARRAY['customer'::text, 'merchant'::text, 'system'::text])))
+ wallets             | FOREIGN KEY | wallets_customer_id_fkey                        | FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+ wallets             | FOREIGN KEY | wallets_merchant_id_fkey                        | FOREIGN KEY (merchant_id) REFERENCES merchants(merchant_id)
+ wallets             | PRIMARY KEY | wallets_pkey                                    | PRIMARY KEY (wallet_id)
+ wallets             | UNIQUE      | wallets_customer_id_currency_key                | UNIQUE (customer_id, currency)
+ wallets             | UNIQUE      | wallets_merchant_id_currency_key                | UNIQUE (merchant_id, currency)
+ wallets             | UNIQUE      | wallets_system_code_key                         | UNIQUE (system_code)
+ wallets             | UNIQUE      | wallets_wallet_number_key                       | UNIQUE (wallet_number)
+ withdrawals         | CHECK       | withdrawal_posted_when_completed                | CHECK (((status = 'completed'::text) = (transaction_id IS NOT NULL)))
+ withdrawals         | CHECK       | withdrawals_amount_kobo_check                   | CHECK ((amount_kobo > 0))
+ withdrawals         | CHECK       | withdrawals_bank_account_number_check           | CHECK ((bank_account_number ~ '^[0-9]{10}$'::text))
+ withdrawals         | CHECK       | withdrawals_status_check                        | CHECK ((status = ANY (ARRAY['pending'::text, 'completed'::text, 'failed'::text])))
+ withdrawals         | FOREIGN KEY | withdrawals_bank_code_fkey                      | FOREIGN KEY (bank_code) REFERENCES banks(bank_code)
+ withdrawals         | FOREIGN KEY | withdrawals_transaction_id_fkey                 | FOREIGN KEY (transaction_id) REFERENCES ledger_transactions(transaction_id)
+ withdrawals         | FOREIGN KEY | withdrawals_wallet_id_fkey                      | FOREIGN KEY (wallet_id) REFERENCES wallets(wallet_id)
+ withdrawals         | PRIMARY KEY | withdrawals_pkey                                | PRIMARY KEY (withdrawal_id)
+ withdrawals         | UNIQUE      | withdrawals_transaction_id_key                  | UNIQUE (transaction_id)
+(94 rows)
+
+== Unique expression and partial indexes ==
+  tablename  |           indexname           |                                                                                indexdef                                                                                 
+-------------+-------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ staff       | staff_email_unique            | CREATE UNIQUE INDEX staff_email_unique ON wallet.staff USING btree (lower(email))
+ customers   | customers_email_unique        | CREATE UNIQUE INDEX customers_email_unique ON wallet.customers USING btree (lower(email))
+ kyc_reviews | kyc_reviews_one_live_per_tier | CREATE UNIQUE INDEX kyc_reviews_one_live_per_tier ON wallet.kyc_reviews USING btree (document_id, tier) WHERE (status = ANY (ARRAY['pending'::text, 'approved'::text]))
+(3 rows)
+
+== Triggers ==
+     table_name      |          trigger_name           | event  | timing 
+---------------------+---------------------------------+--------+--------
+ audit_log           | audit_log_append_only           | DELETE | BEFORE
+ audit_log           | audit_log_append_only           | UPDATE | BEFORE
+ ledger_entries      | ledger_entries_append_only      | DELETE | BEFORE
+ ledger_entries      | ledger_entries_append_only      | UPDATE | BEFORE
+ ledger_entries      | ledger_entries_balanced         | INSERT | AFTER
+ ledger_transactions | ledger_transactions_append_only | DELETE | BEFORE
+ ledger_transactions | ledger_transactions_append_only | UPDATE | BEFORE
+ ledger_transactions | ledger_transactions_balanced    | INSERT | AFTER
+ reversals           | reversals_mirror_original       | INSERT | AFTER
+ wallets             | wallets_audit_status            | UPDATE | AFTER
+(10 rows)
+

@@ -1,0 +1,40 @@
+ test_no |                       test                       | expected |  actual  |                    caught_by                    | outcome 
+---------+--------------------------------------------------+----------+----------+-------------------------------------------------+---------
+       1 | Duplicate customer email, different case         | 23505    | 23505    | customers_email_unique                          | PASS
+       2 | Duplicate customer phone                         | 23505    | 23505    | customers_phone_key                             | PASS
+       3 | Second NGN wallet for one customer               | 23505    | 23505    | wallets_customer_id_currency_key                | PASS
+       4 | Wallet for a customer that does not exist        | 23503    | 23503    | wallets_customer_id_fkey                        | PASS
+       5 | Delete a customer who has linked records         | 23503    | 23503    | kyc_documents_customer_id_fkey                  | PASS
+       6 | Same KYC document registered to another customer | 23505    | 23505    | kyc_documents_document_type_document_number_key | PASS
+       7 | Second approved review, same document and tier   | 23505    | 23505    | kyc_reviews_one_live_per_tier                   | PASS
+       8 | Same wallet twice in one transaction             | 23505    | 23505    | ledger_entries_transaction_id_wallet_id_key     | PASS
+       9 | Reverse the same transaction twice               | 23505    | 23505    | reversals_original_transaction_id_key           | PASS
+      10 | Invalid phone format                             | 23514    | 23514    | customers_phone_check                           | PASS
+      11 | Wallet with two owners                           | 23514    | 23514    | wallet_has_exactly_one_owner                    | PASS
+      12 | Customer wallet balance below zero               | 23514    | 23514    | wallet_balance_not_negative                     | PASS
+      13 | System wallet balance below zero is allowed      | accepted | accepted |                                                 | PASS
+      14 | Ledger entry of zero                             | 23514    | 23514    | ledger_entries_amount_kobo_check                | PASS
+      15 | Transfer to the same wallet                      | 23514    | 23514    | transfer_not_to_self                            | PASS
+      16 | Transfer with zero amount                        | 23514    | 23514    | transfers_amount_kobo_check                     | PASS
+      17 | Completed transfer with no ledger transaction    | 23514    | 23514    | transfer_posted_when_completed                  | PASS
+      18 | Failed transfer with no reason                   | 23514    | 23514    | transfer_failure_has_reason                     | PASS
+      19 | KYC approved with no reviewer                    | 23514    | 23514    | kyc_review_outcome_recorded                     | PASS
+      20 | Reversal requested and approved by one person    | 23514    | 23514    | reversal_needs_two_people                       | PASS
+      21 | Balanced transaction                             | accepted | accepted |                                                 | PASS
+      22 | Unbalanced transaction                           | 23514    | 23514    | ledger_transaction_balanced                     | PASS
+      23 | Transaction with one entry                       | 23514    | 23514    | ledger_transaction_balanced                     | PASS
+      24 | Transaction with no entries                      | 23514    | 23514    | ledger_transaction_balanced                     | PASS
+      25 | Reversal for the wrong amount                    | 23514    | 23514    | reversal_mirrors_original                       | PASS
+      26 | Reversal using a non-reversal transaction        | 23514    | 23514    | reversal_type_is_reversal                       | PASS
+      27 | Update a ledger entry                            | 23001    | 23001    |                                                 | PASS
+      28 | Delete a ledger entry                            | 23001    | 23001    |                                                 | PASS
+      29 | Truncate the ledger entries                      | 23001    | 23001    |                                                 | PASS
+      30 | Update a ledger transaction                      | 23001    | 23001    |                                                 | PASS
+      31 | Delete an audit row                              | 23001    | 23001    |                                                 | PASS
+(31 rows)
+
+ tests | passed | failed 
+-------+--------+--------
+    31 |     31 |      0
+(1 row)
+

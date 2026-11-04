@@ -1,0 +1,97 @@
+---
+config:
+  theme: neutral
+---
+erDiagram
+    wallets ||--o{ ledger_entries : "changed by"
+    ledger_transactions ||--|{ ledger_entries : "made of"
+    wallets ||--o{ deposits : "funded by"
+    ledger_transactions |o--o| deposits : "posts"
+    wallets ||--o{ withdrawals : "paid out by"
+    banks ||--o{ withdrawals : "receives"
+    ledger_transactions |o--o| withdrawals : "posts"
+    wallets ||--o{ transfers : "source"
+    wallets ||--o{ transfers : "destination"
+    ledger_transactions |o--o| transfers : "posts"
+    ledger_transactions ||--o| reversals : "original"
+    ledger_transactions ||--o| reversals : "reversal"
+    staff ||--o{ reversals : "requests"
+    staff ||--o{ reversals : "approves"
+
+    wallets {
+        bigint wallet_id PK
+        char wallet_number UK
+        text wallet_type
+        bigint customer_id FK
+        bigint merchant_id FK
+        text system_code UK
+        char currency
+        bigint balance_kobo
+        text status
+        bigint version
+        timestamptz opened_at
+    }
+    ledger_transactions {
+        bigint transaction_id PK
+        text txn_type
+        text narration
+        timestamptz created_at
+    }
+    ledger_entries {
+        bigint entry_id PK
+        bigint transaction_id FK
+        bigint wallet_id FK
+        bigint amount_kobo
+        timestamptz created_at
+    }
+    deposits {
+        bigint deposit_id PK
+        bigint wallet_id FK
+        bigint amount_kobo
+        text channel
+        text external_reference UK
+        text status
+        bigint transaction_id FK
+        timestamptz created_at
+    }
+    withdrawals {
+        bigint withdrawal_id PK
+        bigint wallet_id FK
+        bigint amount_kobo
+        char bank_code FK
+        char bank_account_number
+        text status
+        bigint transaction_id FK
+        timestamptz created_at
+    }
+    transfers {
+        bigint transfer_id PK
+        bigint source_wallet_id FK
+        bigint destination_wallet_id FK
+        bigint amount_kobo
+        text status
+        text failure_reason
+        bigint transaction_id FK
+        timestamptz created_at
+    }
+    reversals {
+        bigint reversal_id PK
+        bigint original_transaction_id FK
+        bigint reversal_transaction_id FK
+        text reason
+        bigint requested_by FK
+        bigint approved_by FK
+        timestamptz created_at
+    }
+    banks {
+        char bank_code PK
+        text bank_name UK
+    }
+    staff {
+        bigint staff_id PK
+        text full_name
+        text email UK
+        text role
+        boolean is_active
+        timestamptz created_at
+    }

@@ -1,0 +1,89 @@
+---
+config:
+  theme: neutral
+---
+erDiagram
+    customers ||--o{ kyc_documents : "submits"
+    kyc_documents ||--o{ kyc_reviews : "reviewed in"
+    kyc_tiers ||--o{ kyc_reviews : "requested tier"
+    staff |o--o{ kyc_reviews : "reviews"
+    customers ||--o| wallets : "owns"
+    merchants ||--o| wallets : "owns"
+    customers ||--o{ idempotency_keys : "sends"
+    staff |o--o{ audit_log : "acts in"
+
+    customers {
+        bigint customer_id PK
+        text full_name
+        text email UK
+        text phone UK
+        date date_of_birth
+        text status
+        timestamptz created_at
+    }
+    merchants {
+        bigint merchant_id PK
+        text business_name
+        text rc_number UK
+        text category
+        text status
+        timestamptz created_at
+    }
+    staff {
+        bigint staff_id PK
+        text full_name
+        text email UK
+        text role
+        boolean is_active
+        timestamptz created_at
+    }
+    kyc_tiers {
+        smallint tier PK
+        bigint daily_limit_kobo
+        bigint max_balance_kobo
+    }
+    kyc_documents {
+        bigint document_id PK
+        bigint customer_id FK
+        text document_type UK
+        text document_number UK
+        timestamptz created_at
+    }
+    kyc_reviews {
+        bigint review_id PK
+        bigint document_id FK
+        smallint tier FK
+        text status
+        bigint reviewed_by FK
+        timestamptz submitted_at
+        timestamptz reviewed_at
+    }
+    wallets {
+        bigint wallet_id PK
+        char wallet_number UK
+        text wallet_type
+        bigint customer_id FK
+        bigint merchant_id FK
+        text system_code UK
+        char currency
+        bigint balance_kobo
+        text status
+        bigint version
+        timestamptz opened_at
+    }
+    idempotency_keys {
+        bigint customer_id PK
+        text idempotency_key PK
+        text request_hash
+        bigint transaction_id FK
+        timestamptz created_at
+    }
+    audit_log {
+        bigint audit_id PK
+        bigint actor_staff_id FK
+        text action
+        text entity_type
+        bigint entity_id
+        jsonb details
+        timestamptz created_at
+    }
