@@ -1,0 +1,53 @@
+ test_no |                             test                             | expected |  actual  |           caught_by            | outcome 
+---------+--------------------------------------------------------------+----------+----------+--------------------------------+---------
+       1 | Update a balance directly                                    | 23001    | 23001    | balance_changes_through_ledger | PASS
+       2 | Open a wallet with a non-zero balance                        | 23514    | 23514    | wallet_starts_at_zero          | PASS
+       3 | Ledger entries update both balances                          | accepted | accepted |                                | PASS
+       4 | Debit a frozen wallet                                        | 23514    | 23514    | wallet_must_be_active          | PASS
+       5 | Credit a frozen wallet                                       | accepted | accepted |                                | PASS
+       6 | Reverse money out of a frozen wallet                         | accepted | accepted |                                | PASS
+       7 | Credit a closed wallet                                       | 23514    | 23514    | wallet_must_be_active          | PASS
+       8 | Transfer row with a different amount from its ledger entries | 23514    | 23514    | request_matches_ledger         | PASS
+       9 | Transfer row whose wallets are the wrong way round           | 23514    | 23514    | request_matches_ledger         | PASS
+      10 | Transfer row pointing at a deposit transaction               | 23514    | 23514    | request_matches_ledger         | PASS
+      11 | Deposit row with a different amount from its ledger entries  | 23514    | 23514    | request_matches_ledger         | PASS
+      12 | Withdrawal that matches its ledger entries                   | accepted | accepted |                                | PASS
+      13 | transfer(): zero amount                                      | 22023    | 22023    |                                | PASS
+      14 | transfer(): to the same wallet                               | 22023    | 22023    |                                | PASS
+      15 | transfer(): unknown wallet                                   | P0002    | P0002    |                                | PASS
+      16 | transfer(): from a merchant wallet                           | 22023    | 22023    |                                | PASS
+      17 | transfer(): same key reused for a different amount           | 22023    | 22023    |                                | PASS
+(17 rows)
+
+ tests | passed | failed 
+-------+--------+--------
+    17 |     17 |      0
+(1 row)
+
+
+== What transfer() returns in each business case (rolled back afterwards) ==
+          case_          | transfer_id |  status   |     failure_reason      | transaction_id | replayed 
+-------------------------+-------------+-----------+-------------------------+----------------+----------
+ Normal transfer         |          13 | completed |                         |             25 | f
+ Same request sent again |          13 | completed |                         |             25 | t
+ From a frozen wallet    |          14 | failed    | source wallet is frozen |                | f
+ More than the balance   |          15 | failed    | insufficient funds      |                | f
+ To a frozen wallet      |          16 | completed |                         |             26 | f
+(5 rows)
+
+ wallet_number | status | balance_kobo 
+---------------+--------+--------------
+ 0000000001    | active |     -9500000
+ 1000000001    | active |      6550000
+ 1000000002    | active |      2000000
+ 1000000003    | frozen |       100000
+ 2000000001    | active |       850000
+(5 rows)
+
+
+== Existing rows checked against the same rules ==
+ requests_not_matching_ledger | balances_not_matching_ledger | ledger_net_kobo 
+------------------------------+------------------------------+-----------------
+                            0 |                            0 |               0
+(1 row)
+

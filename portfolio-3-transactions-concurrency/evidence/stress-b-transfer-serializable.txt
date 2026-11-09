@@ -1,0 +1,43 @@
+Stress run: b-transfer-serializable
+Script: stress/safe.pgbench, 16 clients, 15 seconds, client settings: -c default_transaction_isolation=serializable
+
+pgbench (16.15)
+transaction type: /tmp/safe.pgbench
+scaling factor: 1
+query mode: simple
+number of clients: 16
+number of threads: 4
+maximum number of tries: 10
+duration: 15 s
+number of transactions actually processed: 4567
+number of failed transactions: 4388 (49.001%)
+number of serialization failures: 4388 (49.001%)
+number of deadlock failures: 0 (0.000%)
+number of transactions retried: 7113 (79.430%)
+total number of retries: 51581
+latency average = 26.810 ms (including failures)
+initial connection time = 6.373 ms
+tps = 304.363285 (without initial connection time)
+
+Deadlocks detected by the server during the run: 0
+
+== Is money conserved? ==
+ funded_kobo | stored_total_kobo | ledger_total_kobo | money_created_kobo 
+-------------+-------------------+-------------------+--------------------
+    20000000 |          20000000 |          20000000 |                  0
+
+== Do stored balances match the ledger? ==
+ wallets_wrong | total_error_kobo | lowest_stored_kobo | lowest_ledger_kobo 
+---------------+------------------+--------------------+--------------------
+             0 |                0 |              91038 |              91038
+
+== Whole ledger ==
+ entry_count | net_kobo 
+-------------+----------
+       58727 |        0
+
+== Transfers posted during the run ==
+ ledger_transfers 
+------------------
+            29334
+

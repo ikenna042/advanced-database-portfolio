@@ -1,0 +1,23 @@
+Extract from an earlier full run of run.sh on 9 November 2026, stress run
+a-naive-serializable (naive_transfer, 16 clients, 15 seconds, SERIALIZABLE).
+This is kept outside evidence/ because run.sh rewrites that folder, and the error
+did not recur in the final run. Copied verbatim from the pgbench output.
+
+pgbench (16.15)
+pgbench: error: client 4 script 0 aborted in command 3 query 0: ERROR:  new multixact has more than one updating member: 0 3[76536 (nokeyupd), 76540 (keysh), 76540 (nokeyupd)]
+CONTEXT:  SQL statement "UPDATE wallets SET balance_kobo = v_source_bal - p_amount_kobo WHERE wallet_id = v_source_id"
+PL/pgSQL function naive_transfer(character,character,bigint) line 26 at SQL statement
+pgbench: error: client 0 script 0 aborted in command 3 query 0: ERROR:  new multixact has more than one updating member: 0 4[76536 (keysh), 76536 (nokeyupd), 76548 (keysh), 76548 (nokeyupd)]
+CONTEXT:  SQL statement "UPDATE wallets SET balance_kobo = v_source_bal - p_amount_kobo WHERE wallet_id = v_source_id"
+PL/pgSQL function naive_transfer(character,character,bigint) line 26 at SQL statement
+transaction type: /tmp/naive.pgbench
+number of clients: 16
+maximum number of tries: 10
+duration: 15 s
+number of transactions actually processed: 523
+number of failed transactions: 728 (58.193%)
+number of serialization failures: 727 (58.114%)
+number of deadlock failures: 1 (0.080%)
+number of transactions retried: 1136 (90.807%)
+tps = 34.727804 (without initial connection time)
+pgbench: error: Run was aborted; the above results are incomplete.

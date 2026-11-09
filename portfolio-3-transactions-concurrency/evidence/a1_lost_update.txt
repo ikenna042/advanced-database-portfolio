@@ -1,0 +1,189 @@
+
+=== A1.1  Lost update under READ COMMITTED (the default) ===
+Each session reads Alpha's balance, then writes back (what it read - amount).
+SELECT wallet_number, stored_kobo, ledger_kobo, difference_kobo
+  FROM v_wallet_balance_audit WHERE wallet_number = '1000000001';
+ wallet_number | stored_kobo | ledger_kobo | difference_kobo 
+---------------+-------------+-------------+-----------------
+ 1000000001    |     6650000 |     6650000 |               0
+
+[A] begins and reads Alpha's balance
+BEGIN;
+SELECT balance_kobo AS a_read FROM wallets WHERE wallet_number = '1000000001' 
+    A read 6650000
+[B] begins and reads the same balance
+SELECT pg_temp.b('BEGIN');
+   b   
+-------
+ BEGIN
+
+SELECT pg_temp.b_value($$SELECT balance_kobo::text FROM wallets WHERE wallet_number = '1000000001'$$) AS b_read 
+    B read 6650000
+[A] sends N1,000 to Bravo: posts the ledger entries, writes the balance it computed, commits
+SELECT post_entries('1000000001', '1000000002', 100000) AS a_txn;
+ a_txn 
+-------
+    15
+
+UPDATE wallets SET balance_kobo = 6650000 - 100000 WHERE wallet_number = '1000000001';
+UPDATE wallets SET balance_kobo = balance_kobo + 100000 WHERE wallet_number = '1000000002';
+COMMIT;
+[B] sends N2,000 the same way, using the balance it read before A committed
+SELECT pg_temp.b_value($$SELECT post_entries('1000000001', '1000000002', 200000)::text$$) AS b_txn;
+ b_txn 
+-------
+ 16
+
+SELECT pg_temp.b(format($$UPDATE wallets SET balance_kobo = %s WHERE wallet_number = '1000000001'$$, 6650000 - 200000));
+    b     
+----------
+ UPDATE 1
+
+SELECT pg_temp.b($$UPDATE wallets SET balance_kobo = balance_kobo + 200000 WHERE wallet_number = '1000000002'$$);
+    b     
+----------
+ UPDATE 1
+
+SELECT pg_temp.b('COMMIT');
+   b    
+--------
+ COMMIT
+
+Result: the ledger shows both debits, but the stored balance only reflects B's.
+A's N1,000 debit was overwritten, so Alpha's stored balance is N1,000 too high.
+SELECT wallet_number, stored_kobo, ledger_kobo, difference_kobo
+  FROM v_wallet_balance_audit WHERE wallet_number = '1000000001';
+ wallet_number | stored_kobo | ledger_kobo | difference_kobo 
+---------------+-------------+-------------+-----------------
+ 1000000001    |     6450000 |     6350000 |          100000
+
+
+=== A1.2  The same code under REPEATABLE READ: PostgreSQL detects the conflict ===
+[A] begins and reads
+BEGIN ISOLATION LEVEL REPEATABLE READ;
+SELECT balance_kobo AS a_read FROM wallets WHERE wallet_number = '1000000001' 
+[B] begins and reads
+SELECT pg_temp.b('BEGIN ISOLATION LEVEL REPEATABLE READ');
+   b   
+-------
+ BEGIN
+
+SELECT pg_temp.b_value($$SELECT balance_kobo::text FROM wallets WHERE wallet_number = '1000000001'$$) AS b_read 
+[A] debits N1,000 and commits
+SELECT post_entries('1000000001', '1000000002', 100000) AS a_txn;
+ a_txn 
+-------
+    17
+
+UPDATE wallets SET balance_kobo = 6450000 - 100000 WHERE wallet_number = '1000000001';
+UPDATE wallets SET balance_kobo = balance_kobo + 100000 WHERE wallet_number = '1000000002';
+COMMIT;
+[B] tries to update a row changed since its snapshot was taken
+SELECT pg_temp.b_value($$SELECT post_entries('1000000001', '1000000002', 200000)::text$$) AS b_txn;
+ b_txn 
+-------
+ 18
+
+SELECT pg_temp.b(format($$UPDATE wallets SET balance_kobo = %s WHERE wallet_number = '1000000001'$$, 6450000 - 200000)) AS b_update;
+                          b_update                           
+-------------------------------------------------------------
+ ERROR:  could not serialize access due to concurrent update
+
+SELECT pg_temp.b('ROLLBACK');
+    b     
+----------
+ ROLLBACK
+
+[B] retries the whole transaction, as an application must on SQLSTATE 40001
+SELECT pg_temp.b('BEGIN ISOLATION LEVEL REPEATABLE READ');
+   b   
+-------
+ BEGIN
+
+SELECT pg_temp.b_value($$SELECT balance_kobo::text FROM wallets WHERE wallet_number = '1000000001'$$) AS b_read 
+    B now reads 6350000
+SELECT pg_temp.b_value($$SELECT post_entries('1000000001', '1000000002', 200000)::text$$) AS b_txn;
+ b_txn 
+-------
+ 19
+
+SELECT pg_temp.b(format($$UPDATE wallets SET balance_kobo = %s WHERE wallet_number = '1000000001'$$, 6350000 - 200000));
+    b     
+----------
+ UPDATE 1
+
+SELECT pg_temp.b($$UPDATE wallets SET balance_kobo = balance_kobo + 200000 WHERE wallet_number = '1000000002'$$);
+    b     
+----------
+ UPDATE 1
+
+SELECT pg_temp.b('COMMIT');
+   b    
+--------
+ COMMIT
+
+Result: the difference is still the N1,000 lost in A1.1. Nothing new was lost.
+SELECT wallet_number, stored_kobo, ledger_kobo, difference_kobo
+  FROM v_wallet_balance_audit WHERE wallet_number = '1000000001';
+ wallet_number | stored_kobo | ledger_kobo | difference_kobo 
+---------------+-------------+-------------+-----------------
+ 1000000001    |     6150000 |     6050000 |          100000
+
+
+=== A1.3  READ COMMITTED with relative updates and a row lock ===
+Each session writes balance_kobo = balance_kobo - amount, so it never relies on an earlier read.
+[A] begins and debits N1,000, without committing yet
+BEGIN;
+SELECT post_entries('1000000001', '1000000002', 100000) AS a_txn;
+ a_txn 
+-------
+    20
+
+UPDATE wallets SET balance_kobo = balance_kobo - 100000 WHERE wallet_number = '1000000001';
+UPDATE wallets SET balance_kobo = balance_kobo + 100000 WHERE wallet_number = '1000000002';
+[B] begins and tries to debit N2,000: it has to wait for A's row lock
+SELECT pg_temp.b('BEGIN');
+   b   
+-------
+ BEGIN
+
+SELECT pg_temp.b_value($$SELECT post_entries('1000000001', '1000000002', 200000)::text$$) AS b_txn;
+ b_txn 
+-------
+ 21
+
+SELECT pg_temp.b_start($$UPDATE wallets SET balance_kobo = balance_kobo - 200000 WHERE wallet_number = '1000000001'$$);
+ b_start 
+---------
+ started
+
+SELECT * FROM pg_temp.session_b;
+ state  | wait_event_type |  wait_event   |                            query                             
+--------+-----------------+---------------+--------------------------------------------------------------
+ active | Lock            | transactionid | UPDATE wallets SET balance_kobo = balance_kobo - 200000 WHER
+
+[A] commits, which releases the lock
+COMMIT;
+[B] re-reads the committed row and applies its update to it
+SELECT pg_temp.b_finish() AS b_update;
+ b_update 
+----------
+ UPDATE 1
+
+SELECT pg_temp.b($$UPDATE wallets SET balance_kobo = balance_kobo + 200000 WHERE wallet_number = '1000000002'$$);
+    b     
+----------
+ UPDATE 1
+
+SELECT pg_temp.b('COMMIT');
+   b    
+--------
+ COMMIT
+
+Result: still only the original N1,000 difference. Both debits were applied.
+SELECT wallet_number, stored_kobo, ledger_kobo, difference_kobo
+  FROM v_wallet_balance_audit WHERE wallet_number = '1000000001';
+ wallet_number | stored_kobo | ledger_kobo | difference_kobo 
+---------------+-------------+-------------+-----------------
+ 1000000001    |     5850000 |     5750000 |          100000
+

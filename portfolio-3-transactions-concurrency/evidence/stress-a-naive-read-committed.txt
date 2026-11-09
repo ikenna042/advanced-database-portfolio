@@ -1,0 +1,43 @@
+Stress run: a-naive-read-committed
+Script: stress/naive.pgbench, 16 clients, 15 seconds, client settings: none
+
+pgbench (16.15)
+transaction type: /tmp/naive.pgbench
+scaling factor: 1
+query mode: simple
+number of clients: 16
+number of threads: 4
+maximum number of tries: 10
+duration: 15 s
+number of transactions actually processed: 578
+number of failed transactions: 0 (0.000%)
+number of serialization failures: 0 (0.000%)
+number of deadlock failures: 0 (0.000%)
+number of transactions retried: 13 (2.249%)
+total number of retries: 15
+latency average = 446.178 ms
+initial connection time = 8.319 ms
+tps = 35.860135 (without initial connection time)
+
+Deadlocks detected by the server during the run: 17
+
+== Is money conserved? ==
+ funded_kobo | stored_total_kobo | ledger_total_kobo | money_created_kobo 
+-------------+-------------------+-------------------+--------------------
+    20000000 |          22184302 |          20000000 |            2184302
+
+== Do stored balances match the ledger? ==
+ wallets_wrong | total_error_kobo | lowest_stored_kobo | lowest_ledger_kobo 
+---------------+------------------+--------------------+--------------------
+            20 |          3540470 |             753871 |             584567
+
+== Whole ledger ==
+ entry_count | net_kobo 
+-------------+----------
+        1189 |        0
+
+== Transfers posted during the run ==
+ ledger_transfers 
+------------------
+              578
+

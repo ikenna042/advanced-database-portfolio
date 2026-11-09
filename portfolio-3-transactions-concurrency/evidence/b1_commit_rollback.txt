@@ -1,0 +1,140 @@
+CREATE VIEW pg_temp.balances AS
+SELECT wallet_number, balance_kobo FROM wallets
+ WHERE wallet_number IN ('1000000001', '1000000002', '2000000001') ORDER BY wallet_number;
+
+=== B1.1  COMMIT makes a transfer permanent ===
+SELECT * FROM pg_temp.balances;
+ wallet_number | balance_kobo 
+---------------+--------------
+ 1000000001    |      6650000
+ 1000000002    |      2000000
+ 2000000001    |       850000
+
+BEGIN;
+SELECT * FROM transfer('1000000001', '1000000002', 500000, 'b1-commit', 'Commit demo');
+ transfer_id |  status   | failure_reason | transaction_id | replayed 
+-------------+-----------+----------------+----------------+----------
+          17 | completed |                |             27 | f
+
+COMMIT;
+SELECT * FROM pg_temp.balances;
+ wallet_number | balance_kobo 
+---------------+--------------
+ 1000000001    |      6150000
+ 1000000002    |      2500000
+ 2000000001    |       850000
+
+
+=== B1.2  ROLLBACK undoes everything the transaction did ===
+BEGIN;
+SELECT * FROM transfer('1000000001', '1000000002', 300000, 'b1-rollback', 'Rollback demo');
+ transfer_id |  status   | failure_reason | transaction_id | replayed 
+-------------+-----------+----------------+----------------+----------
+          18 | completed |                |             28 | f
+
+Inside the transaction, A sees its own change:
+SELECT * FROM pg_temp.balances;
+ wallet_number | balance_kobo 
+---------------+--------------
+ 1000000001    |      5850000
+ 1000000002    |      2800000
+ 2000000001    |       850000
+
+[B] at the same moment sees only committed data:
+SELECT pg_temp.b_value($$SELECT balance_kobo::text FROM wallets WHERE wallet_number = '1000000001'$$) AS b_sees_alpha;
+ b_sees_alpha 
+--------------
+ 6150000
+
+ROLLBACK;
+After ROLLBACK: balances, ledger, transfer row and idempotency key are all gone.
+SELECT * FROM pg_temp.balances;
+ wallet_number | balance_kobo 
+---------------+--------------
+ 1000000001    |      6150000
+ 1000000002    |      2500000
+ 2000000001    |       850000
+
+SELECT (SELECT count(*) FROM idempotency_keys WHERE idempotency_key = 'b1-rollback') AS keys_left,
+       (SELECT count(*) FROM ledger_transactions WHERE narration = 'Rollback demo') AS ledger_rows_left;
+ keys_left | ledger_rows_left 
+-----------+------------------
+         0 |                0
+
+
+=== B1.3  A SAVEPOINT undoes part of a transaction ===
+BEGIN;
+SELECT * FROM transfer('1000000001', '1000000002', 200000, 'b1-savepoint-1', 'Savepoint demo, kept');
+ transfer_id |  status   | failure_reason | transaction_id | replayed 
+-------------+-----------+----------------+----------------+----------
+          19 | completed |                |             29 | f
+
+SAVEPOINT before_fix;
+A support script then tries to edit a balance directly. The guard trigger rejects it,
+which puts the whole transaction into an aborted state:
+UPDATE wallets SET balance_kobo = balance_kobo + 100000 WHERE wallet_number = '1000000002';
+ERROR:  the balance of wallet 3 can only change through a ledger entry
+CONTEXT:  PL/pgSQL function wallet_guard_balance() line 8 at RAISE
+SELECT 'any statement now fails';
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
+Rolling back to the savepoint keeps the first transfer and clears the error:
+ROLLBACK TO SAVEPOINT before_fix;
+SELECT * FROM transfer('1000000001', '2000000001', 100000, 'b1-savepoint-2', 'Savepoint demo, second');
+ transfer_id |  status   | failure_reason | transaction_id | replayed 
+-------------+-----------+----------------+----------------+----------
+          20 | completed |                |             30 | f
+
+COMMIT;
+SELECT transfer_id, amount_kobo, status, l.narration
+  FROM transfers t JOIN ledger_transactions l USING (transaction_id)
+ WHERE l.narration LIKE 'Savepoint demo%' ORDER BY transfer_id;
+ transfer_id | amount_kobo |  status   |       narration        
+-------------+-------------+-----------+------------------------
+          19 |      200000 | completed | Savepoint demo, kept
+          20 |      100000 | completed | Savepoint demo, second
+
+SELECT * FROM pg_temp.balances;
+ wallet_number | balance_kobo 
+---------------+--------------
+ 1000000001    |      5850000
+ 1000000002    |      2700000
+ 2000000001    |       950000
+
+
+=== B1.4  Atomicity: a check that fails at COMMIT undoes the whole transaction ===
+BEGIN;
+SELECT * FROM transfer('1000000001', '1000000002', 100000, 'b1-atomic', 'Atomicity demo');
+ transfer_id |  status   | failure_reason | transaction_id | replayed 
+-------------+-----------+----------------+----------------+----------
+          21 | completed |                |             31 | f
+
+In the same transaction, a faulty batch job posts a ledger transaction with only one entry.
+INSERT INTO ledger_transactions (txn_type, narration) VALUES ('deposit', 'Faulty batch') RETURNING transaction_id 
+INSERT INTO ledger_entries (transaction_id, wallet_id, amount_kobo)
+SELECT 32, wallet_id, 999 FROM wallets WHERE wallet_number = '1000000002';
+Every statement succeeded. The balanced-ledger check is deferred until COMMIT:
+COMMIT;
+ERROR:  ledger transaction 32 is unbalanced: 1 entries, net 999 kobo
+CONTEXT:  PL/pgSQL function ledger_check_balanced() line 12 at RAISE
+The good transfer was rolled back along with the faulty entry:
+SELECT (SELECT count(*) FROM idempotency_keys WHERE idempotency_key = 'b1-atomic') AS atomic_keys_left,
+       (SELECT count(*) FROM ledger_transactions WHERE narration IN ('Atomicity demo', 'Faulty batch')) AS ledger_rows_left;
+ atomic_keys_left | ledger_rows_left 
+------------------+------------------
+                0 |                0
+
+SELECT * FROM pg_temp.balances;
+ wallet_number | balance_kobo 
+---------------+--------------
+ 1000000001    |      5850000
+ 1000000002    |      2700000
+ 2000000001    |       950000
+
+
+=== Consistency check after B1 ===
+SELECT (SELECT count(*) FROM v_wallet_balance_audit WHERE difference_kobo <> 0) AS balances_not_matching_ledger,
+       (SELECT net_kobo FROM v_ledger_trial_balance) AS ledger_net_kobo;
+ balances_not_matching_ledger | ledger_net_kobo 
+------------------------------+-----------------
+                            0 |               0
+

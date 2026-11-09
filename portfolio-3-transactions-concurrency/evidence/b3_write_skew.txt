@@ -1,0 +1,154 @@
+INSERT INTO staff (full_name, email, role) VALUES ('Finance Officer Two', 'finance.two@kolaro.example', 'finance');
+CREATE VIEW pg_temp.finance AS
+SELECT staff_id, full_name, is_active FROM staff WHERE role = 'finance' ORDER BY staff_id;
+SELECT * FROM pg_temp.finance;
+ staff_id |      full_name      | is_active 
+----------+---------------------+-----------
+        3 | Finance Lead        | t
+        4 | Finance Officer Two | t
+
+
+=== B3.1  REPEATABLE READ: both commit, and the rule is broken ===
+BEGIN ISOLATION LEVEL REPEATABLE READ;
+[A] checks how many finance officers are active
+SELECT count(*) AS active_finance FROM staff WHERE role = 'finance' AND is_active;
+ active_finance 
+----------------
+              2
+
+[B] checks the same
+SELECT pg_temp.b('BEGIN ISOLATION LEVEL REPEATABLE READ');
+   b   
+-------
+ BEGIN
+
+SELECT pg_temp.b_value($$SELECT count(*)::text FROM staff WHERE role = 'finance' AND is_active$$) AS b_active_finance;
+ b_active_finance 
+------------------
+ 2
+
+[A] deactivates Finance Lead; [B] deactivates Finance Officer Two. Different rows, so no lock conflict.
+UPDATE staff SET is_active = FALSE WHERE email = 'finance@kolaro.example';
+SELECT pg_temp.b($$UPDATE staff SET is_active = FALSE WHERE email = 'finance.two@kolaro.example'$$);
+    b     
+----------
+ UPDATE 1
+
+COMMIT;
+SELECT pg_temp.b('COMMIT') AS b_commit;
+ b_commit 
+----------
+ COMMIT
+
+Result: no active finance officer is left.
+SELECT * FROM pg_temp.finance;
+ staff_id |      full_name      | is_active 
+----------+---------------------+-----------
+        3 | Finance Lead        | f
+        4 | Finance Officer Two | f
+
+UPDATE staff SET is_active = TRUE WHERE role = 'finance';
+
+=== B3.2  SERIALIZABLE: PostgreSQL detects the conflict and aborts one transaction ===
+BEGIN ISOLATION LEVEL SERIALIZABLE;
+SELECT count(*) AS active_finance FROM staff WHERE role = 'finance' AND is_active;
+ active_finance 
+----------------
+              2
+
+SELECT pg_temp.b('BEGIN ISOLATION LEVEL SERIALIZABLE');
+   b   
+-------
+ BEGIN
+
+SELECT pg_temp.b_value($$SELECT count(*)::text FROM staff WHERE role = 'finance' AND is_active$$) AS b_active_finance;
+ b_active_finance 
+------------------
+ 2
+
+UPDATE staff SET is_active = FALSE WHERE email = 'finance@kolaro.example';
+SELECT pg_temp.b($$UPDATE staff SET is_active = FALSE WHERE email = 'finance.two@kolaro.example'$$);
+    b     
+----------
+ UPDATE 1
+
+[A] commits first and succeeds
+COMMIT;
+[B] commits second and gets SQLSTATE 40001
+SELECT pg_temp.b('COMMIT') AS b_commit;
+                                       b_commit                                       
+--------------------------------------------------------------------------------------
+ ERROR:  could not serialize access due to read/write dependencies among transactions+
+ DETAIL:  Reason code: Canceled on identification as a pivot, during commit attempt. +
+ HINT:  The transaction might succeed if retried.
+
+[B] retries from the start, as the application must. The check now sees one officer, so B stops.
+SELECT pg_temp.b('BEGIN ISOLATION LEVEL SERIALIZABLE');
+   b   
+-------
+ BEGIN
+
+SELECT pg_temp.b_value($$SELECT count(*)::text FROM staff WHERE role = 'finance' AND is_active$$) AS b_active_finance;
+ b_active_finance 
+------------------
+ 1
+
+SELECT pg_temp.b('ROLLBACK');
+    b     
+----------
+ ROLLBACK
+
+SELECT * FROM pg_temp.finance;
+ staff_id |      full_name      | is_active 
+----------+---------------------+-----------
+        3 | Finance Lead        | f
+        4 | Finance Officer Two | t
+
+UPDATE staff SET is_active = TRUE WHERE role = 'finance';
+
+=== B3.3  READ COMMITTED with SELECT ... FOR UPDATE: the check itself takes locks ===
+BEGIN;
+[A] locks the active finance officers while it checks them
+SELECT staff_id, full_name FROM staff WHERE role = 'finance' AND is_active ORDER BY staff_id FOR UPDATE;
+ staff_id |      full_name      
+----------+---------------------
+        3 | Finance Lead
+        4 | Finance Officer Two
+
+[B] runs the same locking check, and has to wait
+SELECT pg_temp.b('BEGIN');
+   b   
+-------
+ BEGIN
+
+SELECT pg_temp.b_start($$SELECT count(*)::text FROM (SELECT 1 FROM staff WHERE role = 'finance' AND is_active FOR UPDATE) AS s$$);
+ b_start 
+---------
+ started
+
+SELECT * FROM pg_temp.session_b;
+ state  | wait_event_type |  wait_event   |                            query                             
+--------+-----------------+---------------+--------------------------------------------------------------
+ active | Lock            | transactionid | SELECT count(*)::text FROM (SELECT 1 FROM staff WHERE role =
+
+[A] deactivates Finance Lead and commits
+UPDATE staff SET is_active = FALSE WHERE email = 'finance@kolaro.example';
+COMMIT;
+[B] now gets its answer, re-checked against the committed rows: only one officer is active, so B stops
+SELECT pg_temp.b_finish() AS b_active_finance;
+ b_active_finance 
+------------------
+ 1
+
+SELECT pg_temp.b('ROLLBACK');
+    b     
+----------
+ ROLLBACK
+
+SELECT * FROM pg_temp.finance;
+ staff_id |      full_name      | is_active 
+----------+---------------------+-----------
+        3 | Finance Lead        | f
+        4 | Finance Officer Two | t
+
+UPDATE staff SET is_active = TRUE WHERE role = 'finance';

@@ -76,7 +76,7 @@ The schema has 16 tables, so it is shown in two focused views. The [full diagram
 
 ## Known limitations
 
-These rules aren't enforced by the schema. Portfolio 3 enforces the first three in its transfer procedure.
+These rules aren't enforced by this schema. Portfolio 3 adds triggers and a transfer procedure that enforce the first three ([details](../portfolio-3-transactions-concurrency/README.md#rules-added-to-the-schema)).
 
 | Rule | Current status |
 |---|---|

@@ -1,0 +1,6 @@
+-- One random transfer between two different stress wallets, using naive_transfer().
+\set src random(0, 19)
+\set dst (:src + random(1, 19)) % 20
+\set amount random(100, 50000)
+SELECT wallet.naive_transfer('30' || lpad((:src + 1)::text, 8, '0'),
+                             '30' || lpad((:dst + 1)::text, 8, '0'), :amount);

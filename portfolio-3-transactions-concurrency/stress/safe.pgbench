@@ -1,0 +1,9 @@
+-- One random transfer between two different stress wallets, using transfer().
+-- Each request gets a fresh idempotency key.
+\set src random(0, 19)
+\set dst (:src + random(1, 19)) % 20
+\set amount random(100, 50000)
+\set key random(1, 9000000000000000000)
+SELECT status FROM wallet.transfer('30' || lpad((:src + 1)::text, 8, '0'),
+                                   '30' || lpad((:dst + 1)::text, 8, '0'), :amount,
+                                   'stress-' || :client_id || '-' || :key);

@@ -1,0 +1,39 @@
+=== B5. Durability: kill the server and check what survives ===
+
+[A] commits a N1,000 transfer:
+ transfer_id |  status   
+-------------+-----------
+          33 | completed
+(1 row)
+
+[B] starts a N2,000 transfer and keeps its transaction open:
+  pid  | state  |                                 query                                  
+-------+--------+------------------------------------------------------------------------
+ 18886 | active | BEGIN; SELECT transfer('1000000002', '2000000001', 200000, 'b5-uncommi
+(1 row)
+
+Killing the PostgreSQL server with SIGKILL, so it cannot shut down cleanly.
+
+Server log while restarting:
+2026-11-09 14:15:20.387 UTC [28] LOG:  database system was not properly shut down; automatic recovery in progress
+2026-11-09 14:15:20.390 UTC [28] LOG:  redo starts at 2/8DD4E580
+2026-11-09 14:15:21.440 UTC [28] LOG:  redo done at 2/967A3FA0 system usage: CPU: user: 0.60 s, system: 0.43 s, elapsed: 1.05 s
+2026-11-09 14:15:21.692 UTC [26] LOG:  checkpoint complete: wrote 563 buffers (3.4%); 0 WAL file(s) added, 9 removed, 0 recycled; write=0.026 s, sync=0.170 s, total=0.227 s; sync files=177, longest=0.010 s, average=0.001 s; distance=141654 kB, estimate=141654 kB; lsn=2/967A4048, redo lsn=2/967A4048
+2026-11-09 14:15:21.697 UTC [1] LOG:  database system is ready to accept connections
+
+After recovery: the committed transfer is there, and nothing from the open one is:
+         narration          | ledger_rows 
+----------------------------+-------------
+ Committed before the crash |           1
+(1 row)
+
+ idempotency_key | transfer_id 
+-----------------+-------------
+ b5-committed    |          33
+(1 row)
+
+ balances_not_matching_ledger | requests_not_matching_ledger | ledger_net_kobo 
+------------------------------+------------------------------+-----------------
+                            0 |                            0 |               0
+(1 row)
+
