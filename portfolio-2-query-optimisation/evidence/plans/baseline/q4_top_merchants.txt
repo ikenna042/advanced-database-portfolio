@@ -1,0 +1,64 @@
+                                                                                                      QUERY PLAN                                                                                                       
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=65847.51..65847.53 rows=10 width=70) (actual time=155.184..156.501 rows=10 loops=1)
+   Buffers: shared hit=6728 read=30024
+   I/O Timings: shared read=212.749
+   ->  Sort  (cost=65847.51..65852.51 rows=2001 width=70) (actual time=155.183..156.499 rows=10 loops=1)
+         Sort Key: (sum(e.amount_kobo)) DESC
+         Sort Method: top-N heapsort  Memory: 26kB
+         Buffers: shared hit=6728 read=30024
+         I/O Timings: shared read=212.749
+         ->  Finalize GroupAggregate  (cost=65272.30..65804.27 rows=2001 width=70) (actual time=152.535..156.161 rows=2000 loops=1)
+               Group Key: m.merchant_id
+               Buffers: shared hit=6725 read=30024
+               I/O Timings: shared read=212.749
+               ->  Gather Merge  (cost=65272.30..65739.24 rows=4002 width=70) (actual time=152.521..154.521 rows=5979 loops=1)
+                     Workers Planned: 2
+                     Workers Launched: 2
+                     Buffers: shared hit=6725 read=30024
+                     I/O Timings: shared read=212.749
+                     ->  Sort  (cost=64272.28..64277.28 rows=2001 width=70) (actual time=149.906..150.006 rows=1993 loops=3)
+                           Sort Key: m.merchant_id
+                           Sort Method: quicksort  Memory: 240kB
+                           Buffers: shared hit=6725 read=30024
+                           I/O Timings: shared read=212.749
+                           Worker 0:  Sort Method: quicksort  Memory: 240kB
+                           Worker 1:  Sort Method: quicksort  Memory: 240kB
+                           ->  Partial HashAggregate  (cost=64137.55..64162.56 rows=2001 width=70) (actual time=149.068..149.413 rows=1993 loops=3)
+                                 Group Key: m.merchant_id
+                                 Batches: 1  Memory Usage: 625kB
+                                 Buffers: shared hit=6715 read=30024
+                                 I/O Timings: shared read=212.749
+                                 Worker 0:  Batches: 1  Memory Usage: 625kB
+                                 Worker 1:  Batches: 1  Memory Usage: 625kB
+                                 ->  Parallel Hash Join  (cost=1131.19..63088.02 rows=139937 width=38) (actual time=127.569..146.629 rows=16881 loops=3)
+                                       Hash Cond: (e.wallet_id = w.wallet_id)
+                                       Buffers: shared hit=6715 read=30024
+                                       I/O Timings: shared read=212.749
+                                       ->  Parallel Seq Scan on ledger_entries e  (cost=0.00..60608.91 rows=139937 width=16) (actual time=82.742..93.507 rows=113242 loops=3)
+                                             Filter: ((created_at >= '2026-10-01 00:00:00+00'::timestamp with time zone) AND (created_at < '2026-11-01 00:00:00+00'::timestamp with time zone))
+                                             Rows Removed by Filter: 1272091
+                                             Buffers: shared hit=5742 read=28892
+                                             I/O Timings: shared read=93.616
+                                       ->  Parallel Hash  (cost=381.15..381.15 rows=60003 width=38) (actual time=44.117..44.118 rows=667 loops=3)
+                                             Buckets: 131072  Batches: 1  Memory Usage: 1216kB
+                                             Buffers: shared hit=967 read=1132
+                                             I/O Timings: shared read=119.133
+                                             ->  Merge Join  (cost=0.89..381.15 rows=60003 width=38) (actual time=0.820..43.143 rows=667 loops=3)
+                                                   Merge Cond: (w.merchant_id = m.merchant_id)
+                                                   Buffers: shared hit=967 read=1132
+                                                   I/O Timings: shared read=119.133
+                                                   ->  Parallel Index Scan using wallets_merchant_id_currency_key on wallets w  (cost=0.29..13508.57 rows=60003 width=16) (actual time=0.431..41.913 rows=668 loops=3)
+                                                         Buffers: shared hit=914 read=1106
+                                                         I/O Timings: shared read=117.661
+                                                   ->  Index Scan using merchants_pkey on merchants m  (cost=0.28..87.29 rows=2001 width=30) (actual time=0.245..0.830 rows=1779 loops=3)
+                                                         Buffers: shared hit=53 read=26
+                                                         I/O Timings: shared read=1.472
+ Settings: search_path = 'wallet, public'
+ Planning:
+   Buffers: shared hit=301 read=28 dirtied=1
+   I/O Timings: shared read=10.615
+ Planning Time: 11.967 ms
+ Execution Time: 156.664 ms
+(60 rows)
+

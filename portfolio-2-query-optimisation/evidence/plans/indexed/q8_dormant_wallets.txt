@@ -1,0 +1,34 @@
+                                                                                   QUERY PLAN                                                                                   
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate  (cost=36797.63..36797.64 rows=1 width=8) (actual time=431.702..434.005 rows=1 loops=1)
+   Buffers: shared hit=316526 read=34834 written=4
+   I/O Timings: shared read=505.151 write=0.140
+   ->  Gather  (cost=36797.51..36797.62 rows=1 width=8) (actual time=431.433..434.000 rows=2 loops=1)
+         Workers Planned: 1
+         Workers Launched: 1
+         Buffers: shared hit=316526 read=34834 written=4
+         I/O Timings: shared read=505.151 write=0.140
+         ->  Partial Aggregate  (cost=35797.51..35797.52 rows=1 width=8) (actual time=429.448..429.449 rows=1 loops=2)
+               Buffers: shared hit=316526 read=34834 written=4
+               I/O Timings: shared read=505.151 write=0.140
+               ->  Nested Loop Anti Join  (cost=0.43..35716.40 rows=32445 width=0) (actual time=58.786..429.351 rows=160 loops=2)
+                     Buffers: shared hit=316526 read=34834 written=4
+                     I/O Timings: shared read=505.151 write=0.140
+                     ->  Parallel Seq Scan on wallets w  (cost=0.00..3815.04 rows=58833 width=8) (actual time=15.841..52.024 rows=50001 loops=2)
+                           Filter: ((wallet_type = 'customer'::text) AND (status = 'active'::text))
+                           Rows Removed by Filter: 1002
+                           Buffers: shared hit=711 read=2204
+                           I/O Timings: shared read=74.201
+                     ->  Index Only Scan using ledger_entries_wallet_time on ledger_entries e  (cost=0.43..2.06 rows=22 width=8) (actual time=0.007..0.007 rows=1 loops=100002)
+                           Index Cond: ((wallet_id = w.wallet_id) AND (created_at >= '2026-08-01 00:00:00+00'::timestamp with time zone))
+                           Heap Fetches: 2
+                           Buffers: shared hit=315815 read=32630 written=4
+                           I/O Timings: shared read=430.950 write=0.140
+ Settings: search_path = 'wallet, public'
+ Planning:
+   Buffers: shared hit=367 read=17
+   I/O Timings: shared read=0.275
+ Planning Time: 2.113 ms
+ Execution Time: 434.088 ms
+(30 rows)
+

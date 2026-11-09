@@ -1,0 +1,4 @@
+ wallet_number | stored_kobo | ledger_kobo | difference_kobo 
+---------------+-------------+-------------+-----------------
+(0 rows)
+

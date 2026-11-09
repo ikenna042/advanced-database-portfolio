@@ -1,0 +1,5 @@
+ customer_id |   full_name    | wallet_number | balance_kobo | status 
+-------------+----------------+---------------+--------------+--------
+       50006 | Customer 50000 | 1100050000    |     21767446 | active
+(1 row)
+

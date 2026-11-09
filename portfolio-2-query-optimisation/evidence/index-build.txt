@@ -1,0 +1,14 @@
+Time: 2244.751 ms (00:02.245)
+Time: 312.694 ms
+Time: 694.604 ms
+Time: 198.116 ms
+Time: 930.081 ms
+            index_name            |     table_name      |  size  
+----------------------------------+---------------------+--------
+ ledger_entries_wallet_time       | ledger_entries      | 233 MB
+ transfers_source_time            | transfers           | 45 MB
+ transfers_failed_recent          | transfers           | 880 kB
+ ledger_transactions_created_brin | ledger_transactions | 24 kB
+ ledger_entries_created_brin      | ledger_entries      | 24 kB
+(5 rows)
+

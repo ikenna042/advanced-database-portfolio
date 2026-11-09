@@ -1,0 +1,49 @@
+                                                                                                            QUERY PLAN                                                                                                            
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=5439.62..5439.65 rows=10 width=70) (actual time=73.984..75.448 rows=10 loops=1)
+   Buffers: shared hit=8722 read=3652 written=57
+   I/O Timings: shared read=86.619 write=1.123
+   ->  Sort  (cost=5439.62..5444.63 rows=2001 width=70) (actual time=73.983..75.445 rows=10 loops=1)
+         Sort Key: (sum(e.amount_kobo)) DESC
+         Sort Method: top-N heapsort  Memory: 26kB
+         Buffers: shared hit=8722 read=3652 written=57
+         I/O Timings: shared read=86.619 write=1.123
+         ->  Finalize GroupAggregate  (cost=1001.01..5396.38 rows=2001 width=70) (actual time=12.428..75.016 rows=2000 loops=1)
+               Group Key: m.merchant_id
+               Buffers: shared hit=8719 read=3652 written=57
+               I/O Timings: shared read=86.619 write=1.123
+               ->  Gather Merge  (cost=1001.01..5351.36 rows=2001 width=70) (actual time=12.184..74.016 rows=2000 loops=1)
+                     Workers Planned: 1
+                     Workers Launched: 1
+                     Buffers: shared hit=8719 read=3652 written=57
+                     I/O Timings: shared read=86.619 write=1.123
+                     ->  Partial GroupAggregate  (cost=1.00..4126.24 rows=2001 width=70) (actual time=1.432..58.660 rows=1000 loops=2)
+                           Group Key: m.merchant_id
+                           Buffers: shared hit=8719 read=3652 written=57
+                           I/O Timings: shared read=86.619 write=1.123
+                           ->  Merge Join  (cost=1.00..2581.88 rows=202579 width=38) (actual time=0.554..56.226 rows=25321 loops=2)
+                                 Merge Cond: (w.merchant_id = m.merchant_id)
+                                 Buffers: shared hit=8719 read=3652 written=57
+                                 I/O Timings: shared read=86.619 write=1.123
+                                 ->  Nested Loop  (cost=0.72..125111.96 rows=202579 width=16) (actual time=0.406..53.036 rows=25322 loops=2)
+                                       Buffers: shared hit=8693 read=3625 written=57
+                                       I/O Timings: shared read=86.022 write=1.123
+                                       ->  Parallel Index Scan using wallets_merchant_id_currency_key on wallets w  (cost=0.29..13507.47 rows=60003 width=16) (actual time=0.107..13.672 rows=1002 loops=2)
+                                             Buffers: shared hit=752 read=1266 written=22
+                                             I/O Timings: shared read=23.784 write=0.398
+                                       ->  Index Only Scan using ledger_entries_wallet_time on ledger_entries e  (cost=0.43..1.78 rows=8 width=16) (actual time=0.030..0.037 rows=25 loops=2005)
+                                             Index Cond: ((wallet_id = w.wallet_id) AND (created_at >= '2026-10-01 00:00:00+00'::timestamp with time zone) AND (created_at < '2026-11-01 00:00:00+00'::timestamp with time zone))
+                                             Heap Fetches: 0
+                                             Buffers: shared hit=7941 read=2359 written=35
+                                             I/O Timings: shared read=62.239 write=0.725
+                                 ->  Index Scan using merchants_pkey on merchants m  (cost=0.28..87.29 rows=2001 width=30) (actual time=0.057..0.721 rows=1798 loops=2)
+                                       Buffers: shared hit=26 read=27
+                                       I/O Timings: shared read=0.596
+ Settings: search_path = 'wallet, public'
+ Planning:
+   Buffers: shared hit=384 read=11
+   I/O Timings: shared read=0.190
+ Planning Time: 1.478 ms
+ Execution Time: 75.552 ms
+(45 rows)
+

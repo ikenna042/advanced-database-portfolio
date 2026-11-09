@@ -1,0 +1,47 @@
+                                                                                QUERY PLAN                                                                                
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ WindowAgg  (cost=86814.34..86815.59 rows=50 width=78) (actual time=298.138..298.168 rows=50 loops=1)
+   Buffers: shared hit=4616 read=30228
+   I/O Timings: shared read=121.954
+   ->  Sort  (cost=86814.34..86814.46 rows=50 width=54) (actual time=298.123..298.130 rows=50 loops=1)
+         Sort Key: ledger_entries.created_at DESC, ledger_entries.entry_id DESC
+         Sort Method: quicksort  Memory: 29kB
+         Buffers: shared hit=4616 read=30228
+         I/O Timings: shared read=121.954
+         ->  Nested Loop  (cost=86587.63..86812.93 rows=50 width=54) (actual time=297.639..298.090 rows=50 loops=1)
+               Buffers: shared hit=4610 read=30228
+               I/O Timings: shared read=121.954
+               ->  Nested Loop  (cost=86587.19..86596.33 rows=50 width=40) (actual time=297.488..297.525 rows=50 loops=1)
+                     Buffers: shared hit=4410 read=30228
+                     I/O Timings: shared read=121.954
+                     ->  Index Scan using wallets_wallet_number_key on wallets w  (cost=0.42..8.44 rows=1 width=16) (actual time=0.023..0.036 rows=1 loops=1)
+                           Index Cond: (wallet_number = '1100000001'::bpchar)
+                           Buffers: shared hit=4
+                     ->  Limit  (cost=86586.77..86586.90 rows=50 width=32) (actual time=297.451..297.466 rows=50 loops=1)
+                           Buffers: shared hit=4406 read=30228
+                           I/O Timings: shared read=121.954
+                           ->  Sort  (cost=86586.77..86587.00 rows=91 width=32) (actual time=297.449..297.460 rows=50 loops=1)
+                                 Sort Key: ledger_entries.created_at DESC, ledger_entries.entry_id DESC
+                                 Sort Method: top-N heapsort  Memory: 32kB
+                                 Buffers: shared hit=4406 read=30228
+                                 I/O Timings: shared read=121.954
+                                 ->  Seq Scan on ledger_entries  (cost=0.00..86583.81 rows=91 width=32) (actual time=0.010..295.224 rows=6270 loops=1)
+                                       Filter: (wallet_id = w.wallet_id)
+                                       Rows Removed by Filter: 4149728
+                                       Buffers: shared hit=4406 read=30228
+                                       I/O Timings: shared read=121.954
+               ->  Memoize  (cost=0.44..8.46 rows=1 width=30) (actual time=0.011..0.011 rows=1 loops=50)
+                     Cache Key: ledger_entries.transaction_id
+                     Cache Mode: logical
+                     Hits: 0  Misses: 50  Evictions: 0  Overflows: 0  Memory Usage: 7kB
+                     Buffers: shared hit=200
+                     ->  Index Scan using ledger_transactions_pkey on ledger_transactions t  (cost=0.43..8.45 rows=1 width=30) (actual time=0.010..0.010 rows=1 loops=50)
+                           Index Cond: (transaction_id = ledger_entries.transaction_id)
+                           Buffers: shared hit=200
+ Settings: search_path = 'wallet, public'
+ Planning:
+   Buffers: shared hit=277
+ Planning Time: 1.502 ms
+ Execution Time: 298.342 ms
+(43 rows)
+

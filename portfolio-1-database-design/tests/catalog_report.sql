@@ -21,7 +21,8 @@ SELECT rel.relname AS table_name,
 SELECT tablename, indexname, indexdef
   FROM pg_indexes
  WHERE schemaname = 'wallet'
-   AND indexname IN ('customers_email_unique', 'staff_email_unique', 'kyc_reviews_one_live_per_tier');
+   AND indexname IN ('customers_email_unique', 'staff_email_unique', 'kyc_reviews_one_live_per_tier')
+ ORDER BY tablename, indexname;
 \echo '== Triggers =='
 SELECT event_object_table AS table_name, trigger_name, event_manipulation AS event, action_timing AS timing
   FROM information_schema.triggers

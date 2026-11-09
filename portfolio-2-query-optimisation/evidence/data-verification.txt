@@ -1,0 +1,52 @@
+== Row counts ==
+     table_name      | row_count 
+---------------------+-----------
+ merchants           |      2001
+ kyc_reviews         |    100003
+ wallets             |    102005
+ customers           |    100003
+ withdrawals         |    199626
+ deposits            |    378994
+ transfers           |   1538567
+ ledger_transactions |   2077999
+ ledger_entries      |   4155998
+(9 rows)
+
+== Rule checks (every violations count must be 0) ==
+                                rule                                 | violations 
+---------------------------------------------------------------------+------------
+ Transactions that do not net to zero or have fewer than two entries |          0
+ Transactions with no entries                                        |          0
+ Whole ledger does not net to zero                                   |          0
+ Stored balance differs from ledger                                  |          0
+ Customer balance ever below zero                                    |          0
+ Entries pointing at a missing wallet                                |          0
+ Entries pointing at a missing transaction                           |          0
+ Requests pointing at a missing transaction                          |          0
+ Transfer amount differs from its ledger entries                     |          0
+(9 rows)
+
+== Activity skew: entries per customer wallet ==
+ fewest | median | most 
+--------+--------+------
+      3 |     25 | 6270
+(1 row)
+
+== Wallets used by the benchmark queries ==
+ wallet_number | entries 
+---------------+---------
+ 1100000001    |    6270
+ 1100050000    |      20
+(2 rows)
+
+== Table and index sizes ==
+     table_name      | table_size | indexes_size 
+---------------------+------------+--------------
+ ledger_entries      | 271 MB     | 214 MB
+ transfers           | 137 MB     | 65 MB
+ ledger_transactions | 142 MB     | 45 MB
+ deposits            | 39 MB      | 39 MB
+ wallets             | 23 MB      | 19 MB
+ withdrawals         | 19 MB      | 8800 kB
+(6 rows)
+

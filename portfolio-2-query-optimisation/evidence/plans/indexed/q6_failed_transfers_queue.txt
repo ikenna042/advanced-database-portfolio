@@ -1,0 +1,29 @@
+                                                                        QUERY PLAN                                                                        
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.72..40.73 rows=50 width=52) (actual time=0.434..1.063 rows=50 loops=1)
+   Buffers: shared hit=169 read=35
+   I/O Timings: shared read=0.730
+   ->  Nested Loop  (cost=0.72..32833.59 rows=41028 width=52) (actual time=0.434..1.058 rows=50 loops=1)
+         Buffers: shared hit=169 read=35
+         I/O Timings: shared read=0.730
+         ->  Index Scan using transfers_failed_recent on transfers t  (cost=0.29..8270.85 rows=41028 width=49) (actual time=0.413..0.567 rows=50 loops=1)
+               Buffers: shared read=4
+               I/O Timings: shared read=0.548
+         ->  Memoize  (cost=0.43..0.78 rows=1 width=19) (actual time=0.009..0.009 rows=1 loops=50)
+               Cache Key: t.source_wallet_id
+               Cache Mode: logical
+               Hits: 0  Misses: 50  Evictions: 0  Overflows: 0  Memory Usage: 7kB
+               Buffers: shared hit=169 read=31
+               I/O Timings: shared read=0.183
+               ->  Index Scan using wallets_pkey on wallets s  (cost=0.42..0.77 rows=1 width=19) (actual time=0.009..0.009 rows=1 loops=50)
+                     Index Cond: (wallet_id = t.source_wallet_id)
+                     Buffers: shared hit=169 read=31
+                     I/O Timings: shared read=0.183
+ Settings: search_path = 'wallet, public'
+ Planning:
+   Buffers: shared hit=301 read=44 dirtied=3
+   I/O Timings: shared read=2.402
+ Planning Time: 3.414 ms
+ Execution Time: 1.250 ms
+(25 rows)
+

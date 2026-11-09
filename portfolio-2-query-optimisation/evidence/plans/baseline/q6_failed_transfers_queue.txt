@@ -1,0 +1,43 @@
+                                                                     QUERY PLAN                                                                      
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=27595.09..27633.04 rows=50 width=53) (actual time=84.845..92.399 rows=50 loops=1)
+   Buffers: shared hit=228 read=17554
+   I/O Timings: shared read=167.303
+   ->  Nested Loop  (cost=27595.09..55698.50 rows=37028 width=53) (actual time=84.844..92.392 rows=50 loops=1)
+         Buffers: shared hit=228 read=17554
+         I/O Timings: shared read=167.303
+         ->  Gather Merge  (cost=27594.66..31907.18 rows=37028 width=50) (actual time=84.800..86.107 rows=50 loops=1)
+               Workers Planned: 2
+               Workers Launched: 2
+               Buffers: shared hit=74 read=17508
+               I/O Timings: shared read=161.515
+               ->  Sort  (cost=26594.64..26633.21 rows=15428 width=50) (actual time=82.662..82.682 rows=565 loops=3)
+                     Sort Key: t.created_at DESC
+                     Sort Method: quicksort  Memory: 1399kB
+                     Buffers: shared hit=74 read=17508
+                     I/O Timings: shared read=161.515
+                     Worker 0:  Sort Method: quicksort  Memory: 1336kB
+                     Worker 1:  Sort Method: quicksort  Memory: 1378kB
+                     ->  Parallel Seq Scan on transfers t  (cost=0.00..25521.37 rows=15428 width=50) (actual time=52.074..80.769 rows=13063 loops=3)
+                           Filter: (status = 'failed'::text)
+                           Rows Removed by Filter: 499793
+                           Buffers: shared read=17508
+                           I/O Timings: shared read=161.515
+         ->  Memoize  (cost=0.43..0.82 rows=1 width=19) (actual time=0.125..0.125 rows=1 loops=50)
+               Cache Key: t.source_wallet_id
+               Cache Mode: logical
+               Hits: 0  Misses: 50  Evictions: 0  Overflows: 0  Memory Usage: 7kB
+               Buffers: shared hit=154 read=46
+               I/O Timings: shared read=5.788
+               ->  Index Scan using wallets_pkey on wallets s  (cost=0.42..0.81 rows=1 width=19) (actual time=0.124..0.124 rows=1 loops=50)
+                     Index Cond: (wallet_id = t.source_wallet_id)
+                     Buffers: shared hit=154 read=46
+                     I/O Timings: shared read=5.788
+ Settings: search_path = 'wallet, public'
+ Planning:
+   Buffers: shared hit=305 read=3
+   I/O Timings: shared read=1.611
+ Planning Time: 3.338 ms
+ Execution Time: 92.620 ms
+(39 rows)
+

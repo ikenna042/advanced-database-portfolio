@@ -1,0 +1,56 @@
+                                                                                QUERY PLAN                                                                                
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Subquery Scan on v_wallet_balance_audit  (cost=253935.93..282831.36 rows=101495 width=83) (actual time=1358.610..1366.681 rows=0 loops=1)
+   Buffers: shared hit=7620 read=29945, temp read=14291 written=23360
+   I/O Timings: shared read=205.011, temp read=22.075 write=191.553
+   ->  Finalize GroupAggregate  (cost=253935.93..281816.41 rows=101495 width=123) (actual time=1358.609..1366.680 rows=0 loops=1)
+         Group Key: w.wallet_id
+         Filter: (((w.balance_kobo)::numeric - COALESCE(sum(e.amount_kobo), '0'::numeric)) <> '0'::numeric)
+         Rows Removed by Filter: 102005
+         Buffers: shared hit=7620 read=29945, temp read=14291 written=23360
+         I/O Timings: shared read=205.011, temp read=22.075 write=191.553
+         ->  Gather Merge  (cost=253935.93..277738.76 rows=204010 width=59) (actual time=1235.518..1280.371 rows=305843 loops=1)
+               Workers Planned: 2
+               Workers Launched: 2
+               Buffers: shared hit=7620 read=29945, temp read=14291 written=23360
+               I/O Timings: shared read=205.011, temp read=22.075 write=191.553
+               ->  Sort  (cost=252935.91..253190.92 rows=102005 width=59) (actual time=1220.003..1228.076 rows=101948 loops=3)
+                     Sort Key: w.wallet_id
+                     Sort Method: external merge  Disk: 7104kB
+                     Buffers: shared hit=7620 read=29945, temp read=14291 written=23360
+                     I/O Timings: shared read=205.011, temp read=22.075 write=191.553
+                     Worker 0:  Sort Method: external merge  Disk: 7096kB
+                     Worker 1:  Sort Method: external merge  Disk: 7096kB
+                     ->  Partial HashAggregate  (cost=212281.72..240613.97 rows=102005 width=59) (actual time=1057.073..1184.558 rows=101948 loops=3)
+                           Group Key: w.wallet_id
+                           Planned Partitions: 4  Batches: 5  Memory Usage: 8241kB  Disk Usage: 31968kB
+                           Buffers: shared hit=7604 read=29945, temp read=11629 written=20692
+                           I/O Timings: shared read=205.011, temp read=18.813 write=171.450
+                           Worker 0:  Batches: 5  Memory Usage: 8241kB  Disk Usage: 32168kB
+                           Worker 1:  Batches: 5  Memory Usage: 8241kB  Disk Usage: 32048kB
+                           ->  Parallel Hash Right Join  (cost=4265.07..60761.47 rows=1731660 width=35) (actual time=64.177..624.034 rows=1385333 loops=3)
+                                 Hash Cond: (e.wallet_id = w.wallet_id)
+                                 Buffers: shared hit=7604 read=29945
+                                 I/O Timings: shared read=205.011
+                                 ->  Parallel Seq Scan on ledger_entries e  (cost=0.00..51950.60 rows=1731660 width=16) (actual time=0.023..107.878 rows=1385333 loops=3)
+                                       Buffers: shared hit=6510 read=28124
+                                       I/O Timings: shared read=93.345
+                                 ->  Parallel Hash  (cost=3515.03..3515.03 rows=60003 width=27) (actual time=63.514..63.515 rows=34002 loops=3)
+                                       Buckets: 131072  Batches: 1  Memory Usage: 7456kB
+                                       Buffers: shared hit=1094 read=1821
+                                       I/O Timings: shared read=111.665
+                                       ->  Parallel Seq Scan on wallets w  (cost=0.00..3515.03 rows=60003 width=27) (actual time=33.618..52.781 rows=34002 loops=3)
+                                             Buffers: shared hit=1094 read=1821
+                                             I/O Timings: shared read=111.665
+ Settings: search_path = 'wallet, public'
+ Planning:
+   Buffers: shared hit=329 read=1
+   I/O Timings: shared read=0.028
+ Planning Time: 1.264 ms
+ JIT:
+   Functions: 59
+   Options: Inlining false, Optimization false, Expressions true, Deforming true
+   Timing: Generation 3.323 ms, Inlining 0.000 ms, Optimization 2.232 ms, Emission 37.260 ms, Total 42.815 ms
+ Execution Time: 1402.517 ms
+(52 rows)
+

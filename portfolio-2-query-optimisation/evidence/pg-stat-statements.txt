@@ -1,0 +1,15 @@
+ calls | total_ms | mean_ms | rows | shared_blks_hit | shared_blks_read |                                 query                                  
+-------+----------+---------+------+-----------------+------------------+------------------------------------------------------------------------
+     3 |   2559.8 |  853.26 |    0 |         1450298 |            91823 | SELECT wallet_number, stored_kobo, ledger_kobo, difference_kobo FROM w
+     3 |   1461.9 |  487.32 |  279 |            5323 |           103763 | SELECT t.created_at::DATE AS day, t.txn_type, count(*) AS transactions
+     3 |    826.7 |  275.56 |    3 |          949229 |           104905 | SELECT count(*) AS dormant_wallets FROM wallet.wallets w WHERE w.walle
+     3 |    545.0 |  181.67 |  150 |           48466 |            26957 | SELECT e.created_at, t.txn_type, t.narration, e.amount_kobo, w.balance
+     3 |    234.7 |   78.22 |   30 |           26658 |            10464 | SELECT m.business_name, m.category, count(*) AS payments, sum(e.amount
+     3 |    227.5 |   75.85 |  279 |            8216 |             6274 | SELECT t.created_at::DATE AS day, t.txn_type, count(*) AS transactions
+     3 |     95.2 |   31.74 |    3 |               6 |             4590 | SELECT c.customer_id, c.full_name, w.wallet_number, w.balance_kobo, w.
+     3 |      2.5 |    0.84 |  150 |             489 |              123 | SELECT t.transfer_id, t.created_at, s.wallet_number AS from_wallet, t.
+     3 |      2.5 |    0.83 |  150 |             642 |                0 | SELECT e.created_at, t.txn_type, t.narration, e.amount_kobo, w.balance
+     3 |      2.0 |    0.65 |    6 |             114 |              135 | WITH RECURSIVE trail AS ( SELECT t.transfer_id, t.source_wallet_id, t.
+     3 |      0.8 |    0.26 |    3 |              15 |                9 | SELECT c.customer_id, c.full_name, w.wallet_number, w.balance_kobo, w.
+(11 rows)
+

@@ -1,0 +1,19 @@
+ setseed 
+---------
+ 
+(1 row)
+
+Customers, merchants and wallets
+KYC documents and reviews
+Planning 2,000,000 transactions
+Posting ledger transactions and entries
+Recording the matching requests
+Funding wallets that would otherwise have gone negative
+Setting stored balances from the ledger
+ setval  
+---------
+ 2077999
+(1 row)
+
+Vacuuming and collecting statistics
+Seeding took 52 seconds

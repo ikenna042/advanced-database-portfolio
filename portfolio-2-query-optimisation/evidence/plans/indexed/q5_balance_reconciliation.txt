@@ -1,0 +1,42 @@
+                                                                                             QUERY PLAN                                                                                             
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Subquery Scan on v_wallet_balance_audit  (cost=27587.36..261940.09 rows=101495 width=83) (actual time=1249.262..1257.092 rows=0 loops=1)
+   Buffers: shared hit=483441 read=30599 written=15
+   I/O Timings: shared read=425.013 write=0.406
+   ->  Finalize GroupAggregate  (cost=27587.36..260925.14 rows=101495 width=123) (actual time=1249.261..1257.090 rows=0 loops=1)
+         Group Key: w.wallet_id
+         Filter: (((w.balance_kobo)::numeric - COALESCE(sum(e.amount_kobo), '0'::numeric)) <> '0'::numeric)
+         Rows Removed by Filter: 102005
+         Buffers: shared hit=483441 read=30599 written=15
+         I/O Timings: shared read=425.013 write=0.406
+         ->  Gather Merge  (cost=27587.36..257612.53 rows=102005 width=59) (actual time=184.585..1211.490 rows=102005 loops=1)
+               Workers Planned: 1
+               Workers Launched: 1
+               Buffers: shared hit=483441 read=30599 written=15
+               I/O Timings: shared read=425.013 write=0.406
+               ->  Partial GroupAggregate  (cost=26587.35..245136.96 rows=102005 width=59) (actual time=158.969..1015.544 rows=51002 loops=2)
+                     Group Key: w.wallet_id
+                     Buffers: shared hit=483441 read=30599 written=15
+                     I/O Timings: shared read=425.013 write=0.406
+                     ->  Merge Left Join  (cost=26587.35..231638.37 rows=2444704 width=35) (actual time=85.021..844.396 rows=2078000 loops=2)
+                           Merge Cond: (w.wallet_id = e.wallet_id)
+                           Buffers: shared hit=483441 read=30599 written=15
+                           I/O Timings: shared read=425.013 write=0.406
+                           ->  Parallel Index Scan using wallets_pkey on wallets w  (cost=0.42..15022.38 rows=60003 width=27) (actual time=0.031..59.016 rows=51002 loops=2)
+                                 Buffers: shared hit=101560 read=927 written=1
+                                 I/O Timings: shared read=31.500 write=0.120
+                           ->  Index Only Scan using ledger_entries_wallet_time on ledger_entries e  (cost=0.43..181684.38 rows=4155997 width=16) (actual time=0.028..492.700 rows=4145028 loops=2)
+                                 Heap Fetches: 220
+                                 Buffers: shared hit=381881 read=29672 written=14
+                                 I/O Timings: shared read=393.513 write=0.286
+ Settings: search_path = 'wallet, public'
+ Planning:
+   Buffers: shared hit=396
+ Planning Time: 1.102 ms
+ JIT:
+   Functions: 21
+   Options: Inlining false, Optimization false, Expressions true, Deforming true
+   Timing: Generation 1.087 ms, Inlining 0.000 ms, Optimization 0.853 ms, Emission 17.108 ms, Total 19.047 ms
+ Execution Time: 1280.494 ms
+(38 rows)
+

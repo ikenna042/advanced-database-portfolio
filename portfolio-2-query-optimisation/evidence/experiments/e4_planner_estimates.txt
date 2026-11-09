@@ -1,0 +1,105 @@
+SET
+Pager usage is off.
+== Is the busy wallet in the most-common-values statistics for ledger_entries.wallet_id? ==
+ busy_wallet_in_mcv_list | n_distinct 
+-------------------------+------------
+ t                       |      45751
+(1 row)
+
+== Estimate when the wallet_id is a literal (the planner can use the statistics) ==
+                                                 QUERY PLAN                                                 
+------------------------------------------------------------------------------------------------------------
+ Index Only Scan using ledger_entries_wallet_time on ledger_entries  (cost=0.43..274.25 rows=5818 width=40)
+   Index Cond: (wallet_id = 9)
+(2 rows)
+
+== Estimate when the wallet is found through a join, as in Q1 (it cannot) ==
+                                                   QUERY PLAN                                                    
+-----------------------------------------------------------------------------------------------------------------
+ Nested Loop  (cost=0.85..19.37 rows=41 width=40)
+   ->  Index Scan using wallets_wallet_number_key on wallets w  (cost=0.42..8.44 rows=1 width=8)
+         Index Cond: (wallet_number = '1100000001'::bpchar)
+   ->  Index Only Scan using ledger_entries_wallet_time on ledger_entries e  (cost=0.43..10.02 rows=91 width=40)
+         Index Cond: (wallet_id = w.wallet_id)
+(5 rows)
+
+== Q8 as the planner chooses it (nested loop with one index probe per wallet) ==
+                                                                                   QUERY PLAN                                                                                   
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate  (cost=36797.63..36797.64 rows=1 width=8) (actual time=165.457..167.565 rows=1 loops=1)
+   Buffers: shared hit=321237 read=30151
+   I/O Timings: shared read=101.904
+   ->  Gather  (cost=36797.51..36797.62 rows=1 width=8) (actual time=165.438..167.563 rows=2 loops=1)
+         Workers Planned: 1
+         Workers Launched: 1
+         Buffers: shared hit=321237 read=30151
+         I/O Timings: shared read=101.904
+         ->  Partial Aggregate  (cost=35797.51..35797.52 rows=1 width=8) (actual time=159.669..159.670 rows=1 loops=2)
+               Buffers: shared hit=321237 read=30151
+               I/O Timings: shared read=101.904
+               ->  Nested Loop Anti Join  (cost=0.43..35716.40 rows=32445 width=0) (actual time=8.238..159.634 rows=160 loops=2)
+                     Buffers: shared hit=321237 read=30151
+                     I/O Timings: shared read=101.904
+                     ->  Parallel Seq Scan on wallets w  (cost=0.00..3815.04 rows=58833 width=8) (actual time=0.208..15.337 rows=50001 loops=2)
+                           Filter: ((wallet_type = 'customer'::text) AND (status = 'active'::text))
+                           Rows Removed by Filter: 1002
+                           Buffers: shared read=2915
+                           I/O Timings: shared read=15.273
+                     ->  Index Only Scan using ledger_entries_wallet_time on ledger_entries e  (cost=0.43..2.06 rows=22 width=8) (actual time=0.003..0.003 rows=1 loops=100002)
+                           Index Cond: ((wallet_id = w.wallet_id) AND (created_at >= '2026-08-01 00:00:00+00'::timestamp with time zone))
+                           Heap Fetches: 2
+                           Buffers: shared hit=321237 read=27236
+                           I/O Timings: shared read=86.631
+ Planning:
+   Buffers: shared hit=6 read=12
+   I/O Timings: shared read=0.074
+ Planning Time: 0.357 ms
+ Execution Time: 167.610 ms
+(29 rows)
+
+== Q8 with nested loops disabled, for diagnosis only ==
+SET
+                                                                              QUERY PLAN                                                                               
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate  (cost=50651.52..50651.53 rows=1 width=8) (actual time=147.765..149.237 rows=1 loops=1)
+   Buffers: shared hit=296 read=11394
+   I/O Timings: shared read=140.660
+   ->  Gather  (cost=50651.31..50651.52 rows=2 width=8) (actual time=145.280..149.230 rows=3 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=296 read=11394
+         I/O Timings: shared read=140.660
+         ->  Partial Aggregate  (cost=49651.31..49651.32 rows=1 width=8) (actual time=140.105..140.108 rows=1 loops=3)
+               Buffers: shared hit=296 read=11394
+               I/O Timings: shared read=140.660
+               ->  Parallel Hash Right Anti Join  (cost=4820.49..49593.85 rows=22982 width=0) (actual time=139.346..140.096 rows=107 loops=3)
+                     Hash Cond: (e.wallet_id = w.wallet_id)
+                     Buffers: shared hit=296 read=11394
+                     I/O Timings: shared read=140.660
+                     ->  Parallel Bitmap Heap Scan on ledger_entries e  (cost=270.03..41803.74 rows=425445 width=8) (actual time=1.201..70.534 rows=336077 loops=3)
+                           Recheck Cond: (created_at >= '2026-08-01 00:00:00+00'::timestamp with time zone)
+                           Rows Removed by Index Recheck: 12079
+                           Heap Blocks: lossy=2921
+                           Buffers: shared hit=2 read=8707
+                           I/O Timings: shared read=129.083
+                           ->  Bitmap Index Scan on ledger_entries_created_brin  (cost=0.00..14.76 rows=1324744 width=0) (actual time=0.204..0.204 rows=87040 loops=1)
+                                 Index Cond: (created_at >= '2026-08-01 00:00:00+00'::timestamp with time zone)
+                                 Buffers: shared hit=1 read=4
+                                 I/O Timings: shared read=0.040
+                     ->  Parallel Hash  (cost=3815.04..3815.04 rows=58833 width=8) (actual time=16.025..16.027 rows=33334 loops=3)
+                           Buckets: 131072  Batches: 1  Memory Usage: 4992kB
+                           Buffers: shared hit=239 read=2676
+                           I/O Timings: shared read=11.431
+                           ->  Parallel Seq Scan on wallets w  (cost=0.00..3815.04 rows=58833 width=8) (actual time=0.446..9.404 rows=33334 loops=3)
+                                 Filter: ((wallet_type = 'customer'::text) AND (status = 'active'::text))
+                                 Rows Removed by Filter: 668
+                                 Buffers: shared hit=239 read=2676
+                                 I/O Timings: shared read=11.431
+ Planning:
+   Buffers: shared hit=6 read=12
+   I/O Timings: shared read=0.055
+ Planning Time: 0.334 ms
+ Execution Time: 149.298 ms
+(39 rows)
+
+RESET

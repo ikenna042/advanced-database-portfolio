@@ -1,0 +1,9 @@
+Benchmark environment, captured 2026-11-09 12:54 WAT
+Docker VM: 8 CPUs, 4180443136 bytes memory, OrbStack
+PostgreSQL 16.15 on aarch64-unknown-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+effective_cache_size = 524288 8kB
+jit = on
+max_parallel_workers_per_gather = 2
+random_page_cost = 4
+shared_buffers = 16384 8kB
+work_mem = 4096 kB

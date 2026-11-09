@@ -1,0 +1,57 @@
+SET
+Pager usage is off.
+CREATE INDEX
+ANALYZE
+== What the planner knows about txn_type ==
+       most_common_vals        |         most_common_freqs         
+-------------------------------+-----------------------------------
+ {transfer,deposit,withdrawal} | {0.7212667,0.18036667,0.09836667}
+(1 row)
+
+== A common value: transfer ==
+                                                             QUERY PLAN                                                              
+-------------------------------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate (actual time=57.938..59.244 rows=1 loops=1)
+   Buffers: shared hit=4 read=1285
+   I/O Timings: shared read=15.826
+   ->  Gather (actual time=57.785..59.236 rows=3 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=4 read=1285
+         I/O Timings: shared read=15.826
+         ->  Partial Aggregate (actual time=55.817..55.817 rows=1 loops=3)
+               Buffers: shared hit=4 read=1285
+               I/O Timings: shared read=15.826
+               ->  Parallel Index Only Scan using e2_txn_type on ledger_transactions (actual time=0.095..33.030 rows=499793 loops=3)
+                     Index Cond: (txn_type = 'transfer'::text)
+                     Heap Fetches: 74
+                     Buffers: shared hit=4 read=1285
+                     I/O Timings: shared read=15.826
+ Planning:
+   Buffers: shared hit=20 read=1
+   I/O Timings: shared read=0.016
+ Planning Time: 0.122 ms
+ Execution Time: 59.264 ms
+(21 rows)
+
+== A rare value: reversal ==
+                                                QUERY PLAN                                                
+----------------------------------------------------------------------------------------------------------
+ Aggregate (actual time=0.015..0.015 rows=1 loops=1)
+   Buffers: shared hit=5
+   ->  Index Only Scan using e2_txn_type on ledger_transactions (actual time=0.013..0.013 rows=1 loops=1)
+         Index Cond: (txn_type = 'reversal'::text)
+         Heap Fetches: 1
+         Buffers: shared hit=5
+ Planning Time: 0.048 ms
+ Execution Time: 0.029 ms
+(8 rows)
+
+== Size of the index ==
+ index_size 
+------------
+ 14 MB
+(1 row)
+
+DROP INDEX
+ANALYZE

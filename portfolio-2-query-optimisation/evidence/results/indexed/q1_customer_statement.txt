@@ -1,0 +1,54 @@
+         created_at         |  txn_type  |     narration      | amount_kobo | balance_after_kobo 
+----------------------------+------------+--------------------+-------------+--------------------
+ 2026-10-31 23:43:58.152+00 | withdrawal | Withdrawal to bank |     -492180 |           28776510
+ 2026-10-31 23:37:23.952+00 | withdrawal | Withdrawal to bank |    -4417160 |           29268690
+ 2026-10-31 22:00:09.792+00 | transfer   | Merchant payment   |     -290357 |           33685850
+ 2026-10-31 19:21:57.456+00 | transfer   | Merchant payment   |     -734904 |           33976207
+ 2026-10-31 17:39:27.936+00 | transfer   | Transfer           |     -233348 |           34711111
+ 2026-10-31 16:20:53.304+00 | transfer   | Merchant payment   |    -1489680 |           34944459
+ 2026-10-31 13:17:43.008+00 | transfer   | Transfer           |    -3312626 |           36434139
+ 2026-10-31 11:23:55.464+00 | deposit    | Wallet funding     |    17572718 |           39746765
+ 2026-10-31 10:15:20.016+00 | transfer   | Transfer           |    -1599492 |           22174047
+ 2026-10-31 09:49:03.216+00 | deposit    | Wallet funding     |    13608049 |           23773539
+ 2026-10-31 09:47:28.608+00 | transfer   | Transfer           |    -3299851 |           10165490
+ 2026-10-31 06:27:13.392+00 | deposit    | Wallet funding     |    13465341 |           13465341
+ 2026-10-31 02:20:58.776+00 | transfer   | Transfer           |    -1245159 |                  0
+ 2026-10-30 23:56:10.608+00 | transfer   | Transfer           |    -4824127 |            1245159
+ 2026-10-30 13:52:31.512+00 | transfer   | Merchant payment   |    -1706870 |            6069286
+ 2026-10-30 06:59:08.448+00 | transfer   | Transfer           |    -4452993 |            7776156
+ 2026-10-30 06:51:31.176+00 | transfer   | Transfer           |    -3826865 |           12229149
+ 2026-10-30 05:52:39.144+00 | transfer   | Transfer           |    -4021910 |           16056014
+ 2026-10-30 05:13:45.48+00  | withdrawal | Withdrawal to bank |    -4322599 |           20077924
+ 2026-10-30 04:34:51.816+00 | transfer   | Transfer           |     -275128 |           24400523
+ 2026-10-30 01:27:45+00     | transfer   | Transfer           |    -4641292 |           24675651
+ 2026-10-30 01:26:10.392+00 | transfer   | Merchant payment   |    -1560430 |           29316943
+ 2026-10-30 00:28:21.432+00 | transfer   | Transfer           |    -4039645 |           30877373
+ 2026-10-29 18:05:27.456+00 | transfer   | Transfer           |    -2695249 |           34917018
+ 2026-10-29 17:34:42.6+00   | transfer   | Transfer           |    -1535998 |           37612267
+ 2026-10-29 16:42:56.304+00 | transfer   | Transfer           |    -1356357 |           39148265
+ 2026-10-29 16:21:54.864+00 | transfer   | Transfer           |    -2310975 |           40504622
+ 2026-10-29 14:45:12.24+00  | withdrawal | Withdrawal to bank |    -1253180 |           42815597
+ 2026-10-29 13:45:17.136+00 | transfer   | Merchant payment   |    -1244150 |           44068777
+ 2026-10-29 12:26:10.968+00 | withdrawal | Withdrawal to bank |    -2400039 |           45312927
+ 2026-10-29 10:11:53.52+00  | transfer   | Transfer           |     -358896 |           47712966
+ 2026-10-29 08:39:54.72+00  | transfer   | Merchant payment   |      -30119 |           48071862
+ 2026-10-29 02:42:14.472+00 | deposit    | Wallet funding     |     1852265 |           48101981
+ 2026-10-29 01:19:27.552+00 | transfer   | Merchant payment   |     -406259 |           46249716
+ 2026-10-29 01:13:56.424+00 | transfer   | Transfer           |    -2408451 |           46655975
+ 2026-10-29 00:48:58.464+00 | withdrawal | Withdrawal to bank |     -210923 |           49064426
+ 2026-10-29 00:35:50.064+00 | transfer   | Transfer           |    -4309675 |           49275349
+ 2026-10-29 00:05:20.976+00 | transfer   | Transfer           |    -1349583 |           53585024
+ 2026-10-28 23:18:50.04+00  | transfer   | Merchant payment   |    -1437908 |           54934607
+ 2026-10-28 23:14:37.752+00 | transfer   | Transfer           |    -2893580 |           56372515
+ 2026-10-28 22:04:43.464+00 | transfer   | Merchant payment   |    -1509911 |           59266095
+ 2026-10-28 21:48:25.848+00 | transfer   | Transfer           |    -3242365 |           60776006
+ 2026-10-28 20:47:27.672+00 | transfer   | Transfer           |    -1126762 |           64018371
+ 2026-10-28 17:28:31.296+00 | deposit    | Wallet funding     |     2114074 |           65145133
+ 2026-10-28 17:26:25.152+00 | transfer   | Transfer           |    -3445790 |           63031059
+ 2026-10-28 15:37:52.968+00 | deposit    | Wallet funding     |    15468613 |           66476849
+ 2026-10-28 13:32:31.632+00 | transfer   | Transfer           |    -4843613 |           51008236
+ 2026-10-28 13:07:02.136+00 | transfer   | Merchant payment   |      -82843 |           55851849
+ 2026-10-28 13:01:46.776+00 | withdrawal | Withdrawal to bank |     -297996 |           55934692
+ 2026-10-28 09:54:08.424+00 | deposit    | Wallet funding     |    19226670 |           56232688
+(50 rows)
+

@@ -1,0 +1,45 @@
+                                                                                             QUERY PLAN                                                                                             
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate  (cost=521.48..523.51 rows=81 width=52) (actual time=5.770..5.774 rows=2 loops=1)
+   Group Key: trail.hop
+   Buffers: shared hit=38 read=45
+   I/O Timings: shared read=5.496
+   CTE trail
+     ->  Recursive Union  (cost=8.86..517.29 rows=81 width=76) (actual time=1.028..5.699 rows=18 loops=1)
+           Buffers: shared hit=32 read=45
+           I/O Timings: shared read=5.496
+           ->  Index Scan using transfers_source_time on transfers t  (cost=8.86..16.88 rows=1 width=76) (actual time=1.027..1.166 rows=17 loops=1)
+                 Index Cond: ((source_wallet_id = $1) AND (created_at >= '2026-10-01 00:00:00+00'::timestamp with time zone) AND (created_at < '2026-10-02 00:00:00+00'::timestamp with time zone))
+                 Buffers: shared hit=1 read=21
+                 I/O Timings: shared read=1.091
+                 InitPlan 1 (returns $1)
+                   ->  Index Scan using wallets_wallet_number_key on wallets  (cost=0.42..8.44 rows=1 width=8) (actual time=0.465..0.466 rows=1 loops=1)
+                         Index Cond: (wallet_number = '1100000001'::bpchar)
+                         Buffers: shared hit=1 read=3
+                         I/O Timings: shared read=0.440
+           ->  Nested Loop  (cost=0.43..49.96 rows=8 width=76) (actual time=1.318..2.262 rows=0 loops=2)
+                 Buffers: shared hit=31 read=24
+                 I/O Timings: shared read=4.405
+                 ->  WorkTable Scan on trail tr  (cost=0.00..0.22 rows=3 width=52) (actual time=0.001..0.004 rows=9 loops=2)
+                       Filter: (hop < 3)
+                 ->  Index Scan using transfers_source_time on transfers n  (cost=0.43..16.53 rows=3 width=40) (actual time=0.250..0.250 rows=0 loops=18)
+                       Index Cond: ((source_wallet_id = tr.destination_wallet_id) AND (created_at > tr.created_at) AND (created_at < (tr.created_at + '48:00:00'::interval)))
+                       Filter: (destination_wallet_id <> ALL (tr.path))
+                       Buffers: shared hit=31 read=24
+                       I/O Timings: shared read=4.405
+   ->  Sort  (cost=4.19..4.39 rows=81 width=20) (actual time=5.738..5.739 rows=18 loops=1)
+         Sort Key: trail.hop, trail.destination_wallet_id
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=38 read=45
+         I/O Timings: shared read=5.496
+         ->  CTE Scan on trail  (cost=0.00..1.62 rows=81 width=20) (actual time=1.030..5.705 rows=18 loops=1)
+               Buffers: shared hit=32 read=45
+               I/O Timings: shared read=5.496
+ Settings: search_path = 'wallet, public'
+ Planning:
+   Buffers: shared hit=356 read=5 dirtied=1
+   I/O Timings: shared read=0.674
+ Planning Time: 1.780 ms
+ Execution Time: 5.922 ms
+(41 rows)
+

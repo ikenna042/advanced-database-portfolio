@@ -1,0 +1,39 @@
+                                                                                      QUERY PLAN                                                                                      
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=39.65..40.68 rows=41 width=78) (actual time=306.933..306.979 rows=50 loops=1)
+   Buffers: shared hit=16158 read=8983 written=2
+   I/O Timings: shared read=283.241 write=0.192
+   ->  WindowAgg  (cost=39.65..40.68 rows=41 width=78) (actual time=306.932..306.972 rows=50 loops=1)
+         Buffers: shared hit=16158 read=8983 written=2
+         I/O Timings: shared read=283.241 write=0.192
+         ->  Sort  (cost=39.65..39.75 rows=41 width=54) (actual time=306.869..306.873 rows=50 loops=1)
+               Sort Key: e.created_at DESC, e.entry_id DESC
+               Sort Method: quicksort  Memory: 701kB
+               Buffers: shared hit=16158 read=8983 written=2
+               I/O Timings: shared read=283.241 write=0.192
+               ->  Nested Loop  (cost=1.27..38.55 rows=41 width=54) (actual time=3.036..304.467 rows=6270 loops=1)
+                     Buffers: shared hit=16152 read=8983 written=2
+                     I/O Timings: shared read=283.241 write=0.192
+                     ->  Nested Loop  (cost=0.85..19.37 rows=41 width=40) (actual time=0.130..2.969 rows=6270 loops=1)
+                           Buffers: shared hit=9 read=46
+                           I/O Timings: shared read=1.078
+                           ->  Index Scan using wallets_wallet_number_key on wallets w  (cost=0.42..8.44 rows=1 width=16) (actual time=0.049..0.058 rows=1 loops=1)
+                                 Index Cond: (wallet_number = '1100000001'::bpchar)
+                                 Buffers: shared hit=4
+                           ->  Index Only Scan using ledger_entries_wallet_time on ledger_entries e  (cost=0.43..10.02 rows=91 width=40) (actual time=0.077..2.211 rows=6270 loops=1)
+                                 Index Cond: (wallet_id = w.wallet_id)
+                                 Heap Fetches: 1
+                                 Buffers: shared hit=5 read=46
+                                 I/O Timings: shared read=1.078
+                     ->  Index Scan using ledger_transactions_pkey on ledger_transactions t  (cost=0.43..0.47 rows=1 width=30) (actual time=0.048..0.048 rows=1 loops=6270)
+                           Index Cond: (transaction_id = e.transaction_id)
+                           Buffers: shared hit=16143 read=8937 written=2
+                           I/O Timings: shared read=282.163 write=0.192
+ Settings: search_path = 'wallet, public'
+ Planning:
+   Buffers: shared hit=356 read=6
+   I/O Timings: shared read=0.173
+ Planning Time: 1.998 ms
+ Execution Time: 307.161 ms
+(35 rows)
+

@@ -1,0 +1,14 @@
+ business_name |  category   | payments | received_kobo 
+---------------+-------------+----------+---------------
+ Merchant 1    | fuel        |     1112 |    1099084968
+ Merchant 2    | electronics |      449 |     458125364
+ Merchant 3    | fuel        |      365 |     364632054
+ Merchant 4    | fuel        |      311 |     297383745
+ Merchant 5    | electronics |      259 |     254279669
+ Merchant 6    | pharmacy    |      242 |     246091073
+ Merchant 8    | fuel        |      231 |     226329059
+ Merchant 7    | fuel        |      232 |     220255437
+ Merchant 9    | electronics |      212 |     209894498
+ Merchant 10   | fuel        |      203 |     195399049
+(10 rows)
+

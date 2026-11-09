@@ -204,9 +204,9 @@
 == Unique expression and partial indexes ==
   tablename  |           indexname           |                                                                                indexdef                                                                                 
 -------------+-------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- staff       | staff_email_unique            | CREATE UNIQUE INDEX staff_email_unique ON wallet.staff USING btree (lower(email))
  customers   | customers_email_unique        | CREATE UNIQUE INDEX customers_email_unique ON wallet.customers USING btree (lower(email))
  kyc_reviews | kyc_reviews_one_live_per_tier | CREATE UNIQUE INDEX kyc_reviews_one_live_per_tier ON wallet.kyc_reviews USING btree (document_id, tier) WHERE (status = ANY (ARRAY['pending'::text, 'approved'::text]))
+ staff       | staff_email_unique            | CREATE UNIQUE INDEX staff_email_unique ON wallet.staff USING btree (lower(email))
 (3 rows)
 
 == Triggers ==

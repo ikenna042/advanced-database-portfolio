@@ -1,0 +1,105 @@
+SET
+Pager usage is off.
+== How closely does physical row order follow created_at? (1.0 = perfectly) ==
+  attname   | correlation 
+------------+-------------
+ txn_type   |  0.45343795
+ created_at |  0.78542286
+(2 rows)
+
+DROP INDEX
+CREATE INDEX
+ANALYZE
+== B-tree: one month (about 8% of rows) ==
+                                                                                 QUERY PLAN                                                                                 
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate (actual time=8.091..9.052 rows=1 loops=1)
+   Buffers: shared hit=470
+   ->  Gather (actual time=8.031..9.048 rows=3 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=470
+         ->  Partial Aggregate (actual time=6.370..6.370 rows=1 loops=3)
+               Buffers: shared hit=470
+               ->  Parallel Index Only Scan using e1_btree on ledger_transactions (actual time=0.025..3.793 rows=56621 loops=3)
+                     Index Cond: ((created_at >= '2026-10-01 00:00:00+00'::timestamp with time zone) AND (created_at < '2026-11-01 00:00:00+00'::timestamp with time zone))
+                     Heap Fetches: 0
+                     Buffers: shared hit=470
+ Planning:
+   Buffers: shared hit=5
+ Planning Time: 0.075 ms
+ Execution Time: 9.074 ms
+(16 rows)
+
+== B-tree: one hour (about 0.01% of rows) ==
+                                                                           QUERY PLAN                                                                           
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate (actual time=0.035..0.035 rows=1 loops=1)
+   Buffers: shared hit=5
+   ->  Index Only Scan using e1_btree on ledger_transactions (actual time=0.011..0.024 rows=228 loops=1)
+         Index Cond: ((created_at >= '2026-10-15 09:00:00+00'::timestamp with time zone) AND (created_at < '2026-10-15 10:00:00+00'::timestamp with time zone))
+         Heap Fetches: 0
+         Buffers: shared hit=5
+ Planning Time: 0.057 ms
+ Execution Time: 0.047 ms
+(8 rows)
+
+== B-tree size ==
+ btree_size 
+------------
+ 45 MB
+(1 row)
+
+DROP INDEX
+CREATE INDEX
+ANALYZE
+== BRIN: one month ==
+                                                                                    QUERY PLAN                                                                                    
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate (actual time=16.456..18.696 rows=1 loops=1)
+   Buffers: shared hit=1666
+   ->  Gather (actual time=16.221..18.691 rows=3 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=1666
+         ->  Partial Aggregate (actual time=14.476..14.477 rows=1 loops=3)
+               Buffers: shared hit=1666
+               ->  Parallel Bitmap Heap Scan on ledger_transactions (actual time=0.482..10.985 rows=56621 loops=3)
+                     Recheck Cond: ((created_at >= '2026-10-01 00:00:00+00'::timestamp with time zone) AND (created_at < '2026-11-01 00:00:00+00'::timestamp with time zone))
+                     Rows Removed by Index Recheck: 6851
+                     Heap Blocks: lossy=763
+                     Buffers: shared hit=1666
+                     ->  Bitmap Index Scan on ledger_transactions_created_brin (actual time=0.128..0.128 rows=16640 loops=1)
+                           Index Cond: ((created_at >= '2026-10-01 00:00:00+00'::timestamp with time zone) AND (created_at < '2026-11-01 00:00:00+00'::timestamp with time zone))
+                           Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=1
+ Planning Time: 0.055 ms
+ Execution Time: 18.723 ms
+(20 rows)
+
+== BRIN: one hour ==
+                                                                              QUERY PLAN                                                                              
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate (actual time=5.072..5.072 rows=1 loops=1)
+   Buffers: shared hit=386
+   ->  Bitmap Heap Scan on ledger_transactions (actual time=1.921..5.055 rows=228 loops=1)
+         Recheck Cond: ((created_at >= '2026-10-15 09:00:00+00'::timestamp with time zone) AND (created_at < '2026-10-15 10:00:00+00'::timestamp with time zone))
+         Rows Removed by Index Recheck: 43862
+         Heap Blocks: lossy=384
+         Buffers: shared hit=386
+         ->  Bitmap Index Scan on ledger_transactions_created_brin (actual time=0.032..0.032 rows=3840 loops=1)
+               Index Cond: ((created_at >= '2026-10-15 09:00:00+00'::timestamp with time zone) AND (created_at < '2026-10-15 10:00:00+00'::timestamp with time zone))
+               Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=1
+ Planning Time: 0.080 ms
+ Execution Time: 5.107 ms
+(14 rows)
+
+== BRIN size ==
+ brin_size 
+-----------
+ 24 kB
+(1 row)
+

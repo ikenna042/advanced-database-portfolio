@@ -1,0 +1,157 @@
+SET
+SET
+Pager usage is off.
+NOTICE:  table "e3_entries" does not exist, skipping
+DROP TABLE
+CREATE TABLE
+DO
+CREATE TABLE
+Timing is on.
+INSERT 0 4155998
+Time: 4234.509 ms (00:04.235)
+Timing is off.
+CREATE INDEX
+ANALYZE
+== Rows per partition (first and last few) ==
+     partition      | row_count 
+--------------------+-----------
+ e3_entries_2025_06 |     31174
+ e3_entries_2025_07 |     32626
+ e3_entries_2025_08 |     32130
+ e3_entries_2025_09 |     30994
+ e3_entries_2025_10 |     29062
+ e3_entries_2025_11 |    328766
+ e3_entries_2025_12 |    339726
+ e3_entries_2026_01 |    339726
+ e3_entries_2026_02 |    306850
+ e3_entries_2026_03 |    339726
+ e3_entries_2026_04 |    328766
+ e3_entries_2026_05 |    339726
+ e3_entries_2026_06 |    328768
+ e3_entries_2026_07 |    339726
+ e3_entries_2026_08 |    339726
+ e3_entries_2026_09 |    328766
+ e3_entries_2026_10 |    339726
+ e3_entries_2026_11 |        14
+(18 rows)
+
+== October totals on the plain table (uses the BRIN index) ==
+                                                                              QUERY PLAN                                                                              
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ HashAggregate (actual time=45.569..46.170 rows=31 loops=1)
+   Group Key: (created_at)::date
+   Batches: 1  Memory Usage: 6169kB
+   Buffers: shared hit=3074
+   ->  Bitmap Heap Scan on ledger_entries (actual time=1.070..33.043 rows=169863 loops=1)
+         Recheck Cond: ((created_at >= '2026-10-01 00:00:00+00'::timestamp with time zone) AND (created_at < '2026-11-01 00:00:00+00'::timestamp with time zone))
+         Rows Removed by Index Recheck: 28904
+         Filter: (amount_kobo > 0)
+         Rows Removed by Filter: 169863
+         Heap Blocks: lossy=3072
+         Buffers: shared hit=3074
+         ->  Bitmap Index Scan on ledger_entries_created_brin (actual time=0.045..0.045 rows=30720 loops=1)
+               Index Cond: ((created_at >= '2026-10-01 00:00:00+00'::timestamp with time zone) AND (created_at < '2026-11-01 00:00:00+00'::timestamp with time zone))
+               Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=1
+ Planning Time: 0.069 ms
+ Execution Time: 46.630 ms
+(18 rows)
+
+== October totals on the partitioned copy (partition pruning) ==
+                                                                                    QUERY PLAN                                                                                    
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ HashAggregate (actual time=41.406..41.717 rows=31 loops=1)
+   Group Key: (e3_entries.created_at)::date
+   Batches: 1  Memory Usage: 3097kB
+   Buffers: shared hit=2832
+   ->  Seq Scan on e3_entries_2026_10 e3_entries (actual time=0.007..28.967 rows=169863 loops=1)
+         Filter: ((created_at >= '2026-10-01 00:00:00+00'::timestamp with time zone) AND (created_at < '2026-11-01 00:00:00+00'::timestamp with time zone) AND (amount_kobo > 0))
+         Rows Removed by Filter: 169863
+         Buffers: shared hit=2832
+ Planning Time: 0.087 ms
+ Execution Time: 41.969 ms
+(10 rows)
+
+== A query that does not filter on the partition key must visit every partition ==
+                                                    QUERY PLAN                                                    
+------------------------------------------------------------------------------------------------------------------
+ Aggregate
+   ->  Append
+         ->  Index Only Scan using e3_entries_2025_06_wallet_id_created_at_idx on e3_entries_2025_06 e3_entries_1
+               Index Cond: (wallet_id = 9)
+         ->  Index Only Scan using e3_entries_2025_07_wallet_id_created_at_idx on e3_entries_2025_07 e3_entries_2
+               Index Cond: (wallet_id = 9)
+         ->  Index Only Scan using e3_entries_2025_08_wallet_id_created_at_idx on e3_entries_2025_08 e3_entries_3
+               Index Cond: (wallet_id = 9)
+         ->  Index Only Scan using e3_entries_2025_09_wallet_id_created_at_idx on e3_entries_2025_09 e3_entries_4
+               Index Cond: (wallet_id = 9)
+         ->  Index Only Scan using e3_entries_2025_10_wallet_id_created_at_idx on e3_entries_2025_10 e3_entries_5
+               Index Cond: (wallet_id = 9)
+         ->  Bitmap Heap Scan on e3_entries_2025_11 e3_entries_6
+               Recheck Cond: (wallet_id = 9)
+               ->  Bitmap Index Scan on e3_entries_2025_11_wallet_id_created_at_idx
+                     Index Cond: (wallet_id = 9)
+         ->  Bitmap Heap Scan on e3_entries_2025_12 e3_entries_7
+               Recheck Cond: (wallet_id = 9)
+               ->  Bitmap Index Scan on e3_entries_2025_12_wallet_id_created_at_idx
+                     Index Cond: (wallet_id = 9)
+         ->  Bitmap Heap Scan on e3_entries_2026_01 e3_entries_8
+               Recheck Cond: (wallet_id = 9)
+               ->  Bitmap Index Scan on e3_entries_2026_01_wallet_id_created_at_idx
+                     Index Cond: (wallet_id = 9)
+         ->  Bitmap Heap Scan on e3_entries_2026_02 e3_entries_9
+               Recheck Cond: (wallet_id = 9)
+               ->  Bitmap Index Scan on e3_entries_2026_02_wallet_id_created_at_idx
+                     Index Cond: (wallet_id = 9)
+         ->  Bitmap Heap Scan on e3_entries_2026_03 e3_entries_10
+               Recheck Cond: (wallet_id = 9)
+               ->  Bitmap Index Scan on e3_entries_2026_03_wallet_id_created_at_idx
+                     Index Cond: (wallet_id = 9)
+         ->  Bitmap Heap Scan on e3_entries_2026_04 e3_entries_11
+               Recheck Cond: (wallet_id = 9)
+               ->  Bitmap Index Scan on e3_entries_2026_04_wallet_id_created_at_idx
+                     Index Cond: (wallet_id = 9)
+         ->  Bitmap Heap Scan on e3_entries_2026_05 e3_entries_12
+               Recheck Cond: (wallet_id = 9)
+               ->  Bitmap Index Scan on e3_entries_2026_05_wallet_id_created_at_idx
+                     Index Cond: (wallet_id = 9)
+         ->  Bitmap Heap Scan on e3_entries_2026_06 e3_entries_13
+               Recheck Cond: (wallet_id = 9)
+               ->  Bitmap Index Scan on e3_entries_2026_06_wallet_id_created_at_idx
+                     Index Cond: (wallet_id = 9)
+         ->  Bitmap Heap Scan on e3_entries_2026_07 e3_entries_14
+               Recheck Cond: (wallet_id = 9)
+               ->  Bitmap Index Scan on e3_entries_2026_07_wallet_id_created_at_idx
+                     Index Cond: (wallet_id = 9)
+         ->  Bitmap Heap Scan on e3_entries_2026_08 e3_entries_15
+               Recheck Cond: (wallet_id = 9)
+               ->  Bitmap Index Scan on e3_entries_2026_08_wallet_id_created_at_idx
+                     Index Cond: (wallet_id = 9)
+         ->  Bitmap Heap Scan on e3_entries_2026_09 e3_entries_16
+               Recheck Cond: (wallet_id = 9)
+               ->  Bitmap Index Scan on e3_entries_2026_09_wallet_id_created_at_idx
+                     Index Cond: (wallet_id = 9)
+         ->  Bitmap Heap Scan on e3_entries_2026_10 e3_entries_17
+               Recheck Cond: (wallet_id = 9)
+               ->  Bitmap Index Scan on e3_entries_2026_10_wallet_id_created_at_idx
+                     Index Cond: (wallet_id = 9)
+         ->  Seq Scan on e3_entries_2026_11 e3_entries_18
+               Filter: (wallet_id = 9)
+         ->  Seq Scan on e3_entries_2026_12 e3_entries_19
+               Filter: (wallet_id = 9)
+         ->  Seq Scan on e3_entries_default e3_entries_20
+               Filter: (wallet_id = 9)
+(66 rows)
+
+== Cost: a primary key on entry_id alone is not allowed ==
+ERROR:  unique constraint on partitioned table must include all partitioning columns
+DETAIL:  PRIMARY KEY constraint on table "e3_entries" lacks column "created_at" which is part of the partition key.
+ERROR:  unique constraint on partitioned table must include all partitioning columns
+DETAIL:  UNIQUE constraint on table "e3_entries" lacks column "created_at" which is part of the partition key.
+== Dropping old data: detach a partition instead of a large DELETE ==
+Timing is on.
+ALTER TABLE
+Time: 16.082 ms
+Timing is off.
+DROP TABLE

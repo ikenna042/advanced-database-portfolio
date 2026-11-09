@@ -1,0 +1,19 @@
+                                                                    QUERY PLAN                                                                     
+---------------------------------------------------------------------------------------------------------------------------------------------------
+ Nested Loop  (cost=0.83..16.88 rows=1 width=48) (actual time=1.173..1.174 rows=1 loops=1)
+   Buffers: shared hit=5 read=3
+   I/O Timings: shared read=1.079
+   ->  Index Scan using customers_email_unique on customers c  (cost=0.42..8.44 rows=1 width=22) (actual time=1.141..1.141 rows=1 loops=1)
+         Index Cond: (lower(email) = 'customer50000@customers.example'::text)
+         Buffers: shared hit=1 read=3
+         I/O Timings: shared read=1.079
+   ->  Index Scan using wallets_customer_id_currency_key on wallets w  (cost=0.42..8.44 rows=1 width=34) (actual time=0.027..0.027 rows=1 loops=1)
+         Index Cond: (customer_id = c.customer_id)
+         Buffers: shared hit=4
+ Settings: search_path = 'wallet, public'
+ Planning:
+   Buffers: shared hit=327
+ Planning Time: 1.227 ms
+ Execution Time: 1.239 ms
+(15 rows)
+

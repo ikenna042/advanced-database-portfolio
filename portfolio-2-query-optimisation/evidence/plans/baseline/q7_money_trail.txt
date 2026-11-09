@@ -1,0 +1,61 @@
+                                                                                                              QUERY PLAN                                                                                                               
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate  (cost=455076.14..455078.16 rows=81 width=52) (actual time=598.504..598.611 rows=2 loops=1)
+   Group Key: trail.hop
+   Buffers: shared hit=2503 read=50031
+   I/O Timings: shared read=68.577
+   CTE trail
+     ->  Recursive Union  (cost=1008.43..455071.95 rows=81 width=76) (actual time=59.414..598.526 rows=18 loops=1)
+           Buffers: shared hit=2497 read=50031
+           I/O Timings: shared read=68.577
+           ->  Gather  (cost=1008.43..31337.93 rows=1 width=76) (actual time=59.413..65.305 rows=17 loops=1)
+                 Workers Planned: 2
+                 Params Evaluated: $1
+                 Workers Launched: 2
+                 Buffers: shared hit=769 read=16743
+                 I/O Timings: shared read=23.488
+                 InitPlan 1 (returns $1)
+                   ->  Index Scan using wallets_wallet_number_key on wallets  (cost=0.42..8.44 rows=1 width=8) (actual time=12.683..12.685 rows=1 loops=1)
+                         Index Cond: (wallet_number = '1100000001'::bpchar)
+                         Buffers: shared hit=1 read=3
+                         I/O Timings: shared read=0.723
+                 ->  Parallel Seq Scan on transfers t  (cost=0.00..30329.39 rows=1 width=76) (actual time=37.997..43.631 rows=6 loops=3)
+                       Filter: ((created_at >= '2026-10-01 00:00:00+00'::timestamp with time zone) AND (created_at < '2026-10-02 00:00:00+00'::timestamp with time zone) AND (source_wallet_id = $1) AND (status = 'completed'::text))
+                       Rows Removed by Filter: 512850
+                       Buffers: shared hit=768 read=16740
+                       I/O Timings: shared read=22.765
+           ->  Hash Join  (cost=0.26..42373.32 rows=8 width=76) (actual time=254.812..266.592 rows=0 loops=2)
+                 Hash Cond: (n.source_wallet_id = tr.destination_wallet_id)
+                 Join Filter: ((n.created_at > tr.created_at) AND (n.created_at < (tr.created_at + '48:00:00'::interval)) AND (n.destination_wallet_id <> ALL (tr.path)))
+                 Rows Removed by Join Filter: 85
+                 Buffers: shared hit=1728 read=33288
+                 I/O Timings: shared read=45.089
+                 ->  Seq Scan on transfers n  (cost=0.00..36740.09 rows=1501539 width=40) (actual time=0.035..184.825 rows=1499377 loops=2)
+                       Filter: (status = 'completed'::text)
+                       Rows Removed by Filter: 39190
+                       Buffers: shared hit=1728 read=33288
+                       I/O Timings: shared read=45.089
+                 ->  Hash  (cost=0.22..0.22 rows=3 width=52) (actual time=0.686..0.686 rows=9 loops=2)
+                       Buckets: 1024  Batches: 1  Memory Usage: 10kB
+                       ->  WorkTable Scan on trail tr  (cost=0.00..0.22 rows=3 width=52) (actual time=0.670..0.674 rows=9 loops=2)
+                             Filter: (hop < 3)
+   ->  Sort  (cost=4.19..4.39 rows=81 width=20) (actual time=598.462..598.463 rows=18 loops=1)
+         Sort Key: trail.hop, trail.destination_wallet_id
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=2503 read=50031
+         I/O Timings: shared read=68.577
+         ->  CTE Scan on trail  (cost=0.00..1.62 rows=81 width=20) (actual time=59.418..598.434 rows=18 loops=1)
+               Buffers: shared hit=2497 read=50031
+               I/O Timings: shared read=68.577
+ Settings: search_path = 'wallet, public'
+ Planning:
+   Buffers: shared hit=315 read=1
+   I/O Timings: shared read=0.099
+ Planning Time: 0.990 ms
+ JIT:
+   Functions: 48
+   Options: Inlining false, Optimization false, Expressions true, Deforming true
+   Timing: Generation 1.878 ms, Inlining 0.000 ms, Optimization 0.812 ms, Emission 21.249 ms, Total 23.939 ms
+ Execution Time: 613.589 ms
+(57 rows)
+
