@@ -1,0 +1,74 @@
+Redis 7.4.12
+
+=== R1  Idempotency: 20 copies of one request arrive at the same moment ===
+Each copy runs: SET idem:<customer>:<key> processing NX EX 86400
+NX means 'only if the key does not exist', so exactly one copy can claim it.
+Copies that got OK (and would go on to post the transfer): 1
+Copies that got nil (and would wait for the stored result): 19
+The winner stores the result, keeping the 24-hour expiry (KEEPTTL):
+OK
+{"status":"completed"}
+Seconds until Redis forgets the key: 86399
+PostgreSQL's idempotency_keys table stays the durable record; Redis is the fast first check.
+
+=== R2  Rate limiting PIN attempts: at most 5 in any 60 seconds ===
+Fixed window with INCR + EXPIRE, the simplest version:
+  attempt 1: count 1, allowed
+  attempt 2: count 2, allowed
+  attempt 3: count 3, allowed
+  attempt 4: count 4, allowed
+  attempt 5: count 5, allowed
+  attempt 6: count 6, BLOCKED
+  attempt 7: count 7, BLOCKED
+A fixed window resets on the minute, so 5 attempts at 09:15:59 and 5 more at 09:16:00 all pass.
+Sliding window with a sorted set, in one atomic Lua script (sliding_window.lua):
+  attempt at +0s: allowed (attempts in the last 60 s: 1)
+  attempt at +5s: allowed (attempts in the last 60 s: 2)
+  attempt at +10s: allowed (attempts in the last 60 s: 3)
+  attempt at +15s: allowed (attempts in the last 60 s: 4)
+  attempt at +20s: allowed (attempts in the last 60 s: 5)
+  attempt at +25s: BLOCKED (attempts in the last 60 s: 5)
+  attempt at +30s: BLOCKED (attempts in the last 60 s: 5)
+  attempt at +61s: allowed (attempts in the last 60 s: 5)
+  attempt at +62s: BLOCKED (attempts in the last 60 s: 5)
+At +61s the attempts from +0s left the window, so one more was allowed.
+
+=== R3  Sessions: a hash per login, deleted automatically after 15 idle minutes ===
+customer_id
+4
+wallet_number
+1100000001
+device
+iphone-15
+kyc_tier
+1
+TTL: 900 seconds. Each request would reset it with EXPIRE.
+
+=== R4  Cache-aside for wallet balances, and why the cache must be invalidated ===
+1. App asks Redis first: GET bal:1100000001 -> '' (a miss)
+2. App reads PostgreSQL (28776510 kobo) and caches it for 30 seconds.
+3. Next read is a hit: GET bal:1100000001 -> 28776510
+4. A N1,000 transfer commits in PostgreSQL. Balance there is now 28676510.
+5. Redis still says 28776510: a stale read, until the key expires.
+6. Fix: the code that commits a transfer also deletes the cached key. GET bal:1100000001 -> ''
+   The next read misses and reloads the true balance. A balance shown on a screen can be
+   briefly stale; the check before spending must always read PostgreSQL (Portfolio 3).
+
+=== R5  Recent activity feed: a capped list per wallet ===
+notification 7
+notification 6
+notification 5
+notification 4
+notification 3
+
+=== Memory used by these keys ===
+  idem:4:pay-7f3a: 96 bytes
+  pin:sliding:4: 152 bytes
+  session:9f2c1e: 136 bytes
+  feed:1100000001: 160 bytes
+
+=== R6  Raw speed on this machine: redis-benchmark, 100,000 requests, 50 clients ===
+SET: 296735.91 requests per second, p50=0.087 msec
+GET: 263852.25 requests per second, p50=0.103 msec
+INCR: 245700.25 requests per second, p50=0.119 msec
+LPUSH: 219298.25 requests per second, p50=0.159 msec

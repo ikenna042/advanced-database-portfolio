@@ -1,0 +1,16 @@
+Daily limit N50,000 (5,000,000 kobo). 50 requests of N2,000 each, from 10 workers at once.
+At most 25 can be approved.
+
+== naive ==
+requests approved:           50
+money actually approved:     10000000 kobo
+spent_kobo stored on record: 3400000 kobo
+over the daily limit by:     5000000 kobo
+record understates spending: 6600000 kobo
+
+== atomic ==
+requests approved:           25
+money actually approved:     5000000 kobo
+spent_kobo stored on record: 5000000 kobo
+over the daily limit by:     0 kobo
+record understates spending: 0 kobo

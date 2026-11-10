@@ -1,0 +1,156 @@
+Collections: audit_events, customers, daily_spend, statements, transfer_edges
+2026-11-10T06:55:08.176+0000	kolaro.customers	5.67MB
+2026-11-10T06:55:10.626+0000	kolaro.customers	71.0MB
+2026-11-10T06:55:10.626+0000	100003 document(s) imported successfully. 0 document(s) failed to import.
+customers: loaded in 5 s
+2026-11-10T06:55:13.835+0000	kolaro.statements	0B
+2026-11-10T06:55:16.838+0000	kolaro.statements	0B
+2026-11-10T06:55:19.838+0000	kolaro.statements	0B
+2026-11-10T06:55:22.838+0000	kolaro.statements	0B
+2026-11-10T06:55:25.840+0000	kolaro.statements	0B
+2026-11-10T06:55:28.840+0000	kolaro.statements	0B
+2026-11-10T06:55:31.837+0000	kolaro.statements	70.7MB
+2026-11-10T06:55:34.837+0000	kolaro.statements	141MB
+2026-11-10T06:55:37.835+0000	kolaro.statements	209MB
+2026-11-10T06:55:39.584+0000	kolaro.statements	268MB
+2026-11-10T06:55:39.584+0000	267761 document(s) imported successfully. 0 document(s) failed to import.
+statements: loaded in 29 s
+2026-11-10T06:55:42.773+0000	127410 document(s) imported successfully. 0 document(s) failed to import.
+transfer_edges: loaded in 3 s
+
+== Row counts in PostgreSQL compared with document counts in MongoDB ==
+customers                         PostgreSQL   100003   MongoDB   100003   match
+statement entries (Aug-Oct 2026)  PostgreSQL   882099   MongoDB   882099   match
+completed transfers (Oct 2026)    PostgreSQL   127410   MongoDB   127410   match
+
+customers         100003 documents, 48.8 MB of BSON, 10.3 MB on disk after compression, average 511 bytes
+statements        267761 documents, 228.9 MB of BSON, 55.4 MB on disk after compression, average 896 bytes
+transfer_edges    127410 documents, 10.1 MB of BSON, 1.6 MB on disk after compression, average 83 bytes
+{
+  buckets: 267761,
+  largest_bucket_entries: 500,
+  largest_bucket_bytes: 103126
+}
+One customer document:
+{
+  _id: 2,
+  full_name: 'Test Customer Bravo',
+  email: 'bravo@customers.example',
+  phone: '+2348000000002',
+  date_of_birth: ISODate('1985-11-02T00:00:00.000Z'),
+  status: 'active',
+  created_at: ISODate('2026-11-10T06:54:13.630Z'),
+  wallet: {
+    wallet_number: '1000000002',
+    status: 'active',
+    balance_kobo: 2000000,
+    opened_at: ISODate('2026-11-10T06:54:13.638Z')
+  },
+  kyc: {
+    current_tier: 1,
+    documents: [
+      {
+        type: 'nin',
+        number: 'SYNTH-NIN-2',
+        submitted_at: ISODate('2026-11-10T06:54:13.646Z'),
+        reviews: [
+          {
+            tier: 1,
+            status: 'approved',
+            reviewed_by_staff_id: 2,
+            submitted_at: ISODate('2026-11-10T06:54:13.649Z'),
+            reviewed_at: ISODate('2026-11-10T06:54:13.649Z')
+          }
+        ]
+      }
+    ]
+  }
+}
+One statement bucket, first 2 of its entries:
+{
+  _id: '1100000001:2026-10:1',
+  wallet_number: '1100000001',
+  wallet_type: 'customer',
+  month: '2026-10',
+  block: 1,
+  entry_count: 40,
+  opening_balance_kobo: 59266095,
+  closing_balance_kobo: 28776510,
+  money_in_kobo: 46498373,
+  money_out_kobo: 76987958,
+  entries: [
+    {
+      entry_id: 3966800,
+      at: ISODate('2026-10-28T23:14:37.752Z'),
+      amount_kobo: -2893580,
+      balance_after_kobo: 56372515,
+      type: 'transfer',
+      narration: 'Transfer',
+      counterparty: {
+        wallet_number: '1100033823',
+        kind: 'customer'
+      }
+    },
+    {
+      entry_id: 3966832,
+      at: ISODate('2026-10-28T23:18:50.040Z'),
+      amount_kobo: -1437908,
+      balance_after_kobo: 54934607,
+      type: 'transfer',
+      narration: 'Merchant payment',
+      counterparty: {
+        wallet_number: '2100000114',
+        kind: 'merchant',
+        merchant: 'Merchant 114',
+        category: 'electronics'
+      }
+    }
+  ]
+}
+
+audit_events: 50000 documents
+[
+  {
+    _id: 'login',
+    events: 35041
+  },
+  {
+    _id: 'device_change',
+    events: 5073
+  },
+  {
+    _id: 'kyc_upload',
+    events: 3967
+  },
+  {
+    _id: 'pin_reset',
+    events: 3423
+  },
+  {
+    _id: 'limit_change',
+    events: 2496
+  }
+]
+Two events of different types, as stored:
+[
+  {
+    customer_id: 21,
+    at: ISODate('2026-10-18T22:29:42.205Z'),
+    type: 'login',
+    success: true,
+    device: 'android-pixel-7',
+    ip: '10.0.248.130'
+  }
+]
+[
+  {
+    customer_id: 13641,
+    at: ISODate('2026-11-06T18:53:49.837Z'),
+    type: 'kyc_upload',
+    document_type: 'passport',
+    file: {
+      pages: 2,
+      size_kb: 690
+    }
+  }
+]

@@ -1,0 +1,67 @@
+=== W1  The validator enforces the document shape ===
+REJECTED  Customer with no email
+          Document failed validation (code 121): missing email
+REJECTED  Customer with an upper-case email
+          Document failed validation (code 121): email: regular expression did not match
+REJECTED  Customer with a non-Nigerian phone number
+          Document failed validation (code 121): phone: regular expression did not match
+REJECTED  Wallet balance stored as a string
+          Document failed validation (code 121): wallet.balance_kobo: type did not match
+REJECTED  Statement bucket with 501 entries (cap is 500)
+          Document failed validation (code 121): entry_count: comparison failed
+REJECTED  Audit event of an unknown type
+          Document failed validation (code 121): type: value was not found in enum
+ACCEPTED  Audit event with extra, unplanned fields (allowed: only common fields are required)
+
+=== W2  One atomic update to an embedded array ===
+Customer 1 uploads a BVN to apply for tier 2. In PostgreSQL this is an INSERT into
+kyc_documents and another into kyc_reviews. Here it is one update to one document.
+{
+  matched: 1,
+  modified: 1
+}
+Compliance approves it: the positional operators find the right array elements.
+{
+  matched: 1,
+  modified: 1
+}
+{
+  full_name: 'Test Customer Alpha',
+  kyc: {
+    current_tier: 2,
+    documents: [
+      {
+        type: 'nin',
+        number: 'SYNTH-NIN-1',
+        submitted_at: ISODate('2026-11-10T06:54:13.646Z'),
+        reviews: [
+          {
+            tier: 1,
+            status: 'approved',
+            reviewed_by_staff_id: 2,
+            submitted_at: ISODate('2026-11-10T06:54:13.649Z'),
+            reviewed_at: ISODate('2026-11-10T06:54:13.649Z')
+          }
+        ]
+      },
+      {
+        type: 'bvn',
+        number: 'SYNTH-BVN-1',
+        submitted_at: ISODate('2026-11-10T09:00:00.000Z'),
+        reviews: [
+          {
+            tier: 2,
+            status: 'approved',
+            submitted_at: ISODate('2026-11-10T09:00:00.000Z'),
+            reviewed_at: ISODate('2026-11-10T10:00:00.000Z'),
+            reviewed_by_staff_id: 2
+          }
+        ]
+      }
+    ]
+  }
+}
+Running the upload again matches nothing, because the filter requires no BVN yet:
+{
+  matched: 0
+}

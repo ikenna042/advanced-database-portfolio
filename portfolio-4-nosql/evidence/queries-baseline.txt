@@ -1,0 +1,147 @@
+Phase: baseline
+
+=== M1  Customer profile by email, with wallet and KYC in one read ===
+{
+  _id: 50000,
+  full_name: 'Customer 49994',
+  phone: '+2348100049994',
+  wallet: {
+    wallet_number: '1100049994',
+    status: 'active',
+    balance_kobo: 30483428,
+    opened_at: ISODate('2025-06-25T06:01:56.201Z')
+  },
+  kyc: {
+    current_tier: 1
+  }
+}
+plan:          COLLSCAN
+keys examined: 0, documents examined: 100003, returned: 1
+median time:   10.697 ms
+
+=== M2  Latest 50 statement entries for wallet 1100000001 ===
+{
+  month: '2026-10',
+  block: 1,
+  closing_balance_kobo: 28776510,
+  entries_returned: 40,
+  newest_entry: {
+    entry_id: 3999900,
+    at: ISODate('2026-10-31T23:43:58.152Z'),
+    amount_kobo: -492180,
+    balance_after_kobo: 28776510,
+    type: 'withdrawal',
+    narration: 'Withdrawal to bank',
+    counterparty: {
+      wallet_number: '0000000001',
+      kind: 'system'
+    }
+  }
+}
+plan:          SORT <- COLLSCAN
+keys examined: 0, documents examined: 267761, returned: 1
+median time:   55.863 ms
+
+=== M3  Tier-1 customers over the N300,000 tier-1 balance cap ===
+{
+  customers: 26474,
+  top_3: [
+    {
+      _id: 56,
+      wallet: {
+        balance_kobo: 290200766
+      }
+    },
+    {
+      _id: 595,
+      wallet: {
+        balance_kobo: 236569171
+      }
+    },
+    {
+      _id: 175,
+      wallet: {
+        balance_kobo: 216829034
+      }
+    }
+  ]
+}
+plan:          SORT <- COLLSCAN
+keys examined: 0, documents examined: 100003, returned: 26474
+median time:   77.410 ms
+
+=== M4  Customer spending by merchant category, October 2026 (aggregation pipeline) ===
+[
+  {
+    _id: 'fuel',
+    payments: 12187,
+    naira: 121997955.21
+  },
+  {
+    _id: 'restaurant',
+    payments: 10129,
+    naira: 102285434.68
+  },
+  {
+    _id: 'electronics',
+    payments: 10138,
+    naira: 101806775.11
+  },
+  {
+    _id: 'pharmacy',
+    payments: 9631,
+    naira: 97183055.82
+  },
+  {
+    _id: 'transport',
+    payments: 4527,
+    naira: 45017459.19
+  },
+  {
+    _id: 'grocery',
+    payments: 4030,
+    naira: 40543326.28
+  }
+]
+plan:          PROJECTION_SIMPLE <- COLLSCAN
+keys examined: 0, documents examined: 267761, returned: 87558
+median time:   229.839 ms
+
+=== M5  Money trail from wallet 1100000001 in October, hops 2 and 3 ($graphLookup) ===
+{
+  first_hop_transfers: 408,
+  onward: [
+    {
+      transfers: 310,
+      hop: Long('2'),
+      distinct_wallets_reached: 300
+    },
+    {
+      transfers: 273,
+      hop: Long('3'),
+      distinct_wallets_reached: 265
+    }
+  ]
+}
+plan:          PROJECTION_SIMPLE <- COLLSCAN
+keys examined: 0, documents examined: 127410, returned: 408
+single run:    13049.645 ms
+
+=== M6  Failed logins in the last 7 days for customer 10204 ===
+[
+  {
+    at: ISODate('2026-11-07T04:40:58.587Z'),
+    device: 'iphone-13',
+    ip: '10.0.52.14'
+  },
+  {
+    at: ISODate('2026-11-03T02:26:48.713Z'),
+    device: 'android-pixel-7',
+    ip: '10.0.196.84'
+  }
+]
+plan:          SORT <- COLLSCAN
+keys examined: 0, documents examined: 50000, returned: 2
+median time:   9.691 ms
+
+TIMINGS [{"phase":"baseline","id":"M1","ms":10.697118},{"phase":"baseline","id":"M2","ms":55.863155},{"phase":"baseline","id":"M3","ms":77.409974},{"phase":"baseline","id":"M4","ms":229.838566},{"phase":"baseline","id":"M5","ms":13049.645298},{"phase":"baseline","id":"M6","ms":9.691393}]

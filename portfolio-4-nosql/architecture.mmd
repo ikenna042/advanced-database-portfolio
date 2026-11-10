@@ -1,0 +1,32 @@
+---
+config:
+  theme: neutral
+---
+flowchart LR
+    app["Kolaro app and staff tools"]
+
+    subgraph hot["Redis: fast, temporary"]
+        r1["idem:* claim a request"]
+        r2["pin:* rate limits"]
+        r3["session:* logins"]
+        r4["bal:* cached balances"]
+    end
+
+    subgraph truth["PostgreSQL: the source of truth"]
+        p1["wallets, ledger, transfers<br/>ACID, constraints, row locks"]
+        p2["outbox of committed changes"]
+    end
+
+    subgraph read["MongoDB: read models"]
+        m1["customers<br/>profile + wallet + KYC"]
+        m2["statements<br/>monthly buckets"]
+        m3["transfer_edges<br/>money graph"]
+        m4["audit_events<br/>flexible, TTL"]
+    end
+
+    app -- "Step 1: check and claim" --> hot
+    app -- "Step 2: move money" --> p1
+    p1 --> p2
+    p2 -- "Step 3: projected after commit<br/>(eventually consistent)" --> read
+    app -- "Step 4: read screens and reports" --> read
+    app -- "write events" --> m4

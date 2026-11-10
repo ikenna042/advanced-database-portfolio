@@ -1,0 +1,12 @@
+Built 7 indexes in 1342 ms
+  customers      _id_                           1084 kB
+  customers      customers_email                3072 kB
+  customers      customers_tier_balance          964 kB
+  statements     _id_                           5824 kB
+  statements     statements_wallet_month        5200 kB
+  statements     statements_month_type          1368 kB
+  transfer_edges _id_                           1404 kB
+  transfer_edges edges_from                     1452 kB
+  audit_events   _id_                            496 kB
+  audit_events   events_customer_type_time      1260 kB
+  audit_events   events_ttl_180_days             556 kB
