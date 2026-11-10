@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Odoh_Ikenna_0310_FinalDocumentation</title>
+<style>
+  @page { size: A4; margin: 14mm 15mm 14mm 15mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 8.9pt; line-height: 1.3; color: #111; margin: 0; }
+  h1 { font-size: 15pt; margin: 0 0 1mm; }
+  h2 { font-size: 10.6pt; margin: 2.6mm 0 1mm; padding-bottom: 0.6mm; border-bottom: 1px solid #999; }
+  h3 { font-size: 9.8pt; margin: 2.2mm 0 0.8mm; }
+  p { margin: 0 0 1.5mm; }
+  ul { margin: 0 0 1.5mm; padding-left: 4.5mm; }
+  li { margin: 0 0 0.3mm; }
+  table { border-collapse: collapse; width: 100%; margin: 0.8mm 0 1.5mm; font-size: 8.1pt; }
+  th, td { border: 1px solid #bbb; padding: 0.4mm 1.3mm; vertical-align: top; text-align: left; }
+  th { background: #eee; }
+  td.n { text-align: right; white-space: nowrap; }
+  .meta { font-size: 9pt; margin-bottom: 1.5mm; }
+  .meta td { border: none; padding: 0 3mm 0 0; }
+  figure { margin: 1.5mm 0 2mm; text-align: center; }
+  figure img { max-width: 100%; border: 1px solid #ccc; }
+  figcaption { font-size: 8.2pt; color: #333; margin-top: 0.6mm; }
+  pre { font-family: Menlo, Consolas, monospace; font-size: 7.6pt; background: #f5f5f5; border: 1px solid #ddd; padding: 1.2mm 1.8mm; margin: 0.8mm 0 1.8mm; white-space: pre-wrap; line-height: 1.25; }
+  code { font-family: Menlo, Consolas, monospace; font-size: 8.4pt; }
+  a { color: #0645ad; text-decoration: none; }
+  .refs { column-count: 2; column-gap: 6mm; }
+  .refs p { break-inside: avoid; padding-left: 4mm; text-indent: -4mm; margin-bottom: 0.5mm; font-size: 8pt; }
+  .page-break { break-before: page; }
+  pre, figure, table { break-inside: avoid; }
+  h2, h3 { break-after: avoid; }
+</style>
+</head>
+<body>
+
+<h1>Advanced Database Systems Portfolio: Kolaro Wallet</h1>
+<table class="meta">
+  <tr><td><b>Course:</b> MIT 8103 Advanced Database Systems, First Semester CA, 2026/2027</td><td><b>Student:</b> Ikenna Odoh, 2026/A/MIT/0310</td></tr>
+  <tr><td colspan="2"><b>GitHub repository (private, shared with the assessor):</b> <a href="https://github.com/ikenna042/advanced-database-portfolio">https://github.com/ikenna042/advanced-database-portfolio</a></td></tr>
+</table>
+
+<h2>1. Selected organisation: Kolaro Wallet (simulated)</h2>
+<p><b>Kolaro Wallet</b> is a simulated Nigerian digital wallet, invented for this portfolio; all data is synthetic. Customers hold naira, fund their wallets, send money to each other and pay merchants.</p>
+<ul>
+  <li><b>Users of the database:</b> customers (through the app), merchants, customer support, compliance officers, finance and reconciliation staff, and auditors.</li>
+  <li><b>Major data:</b> customers, KYC documents and reviews, wallets, merchants, ledger transactions and entries, transfers, deposits, withdrawals, reversals, idempotency keys and audit logs.</li>
+  <li><b>Key operations:</b> open a wallet, deposit, withdraw, transfer, reverse a failed transaction, freeze a wallet, produce a statement, audit balances against the ledger, and report volumes.</li>
+</ul>
+<p>The same case study, schema and data are used in all five portfolios. Everything runs in a local Docker lab with PostgreSQL 16, MongoDB 7.0 and Redis 7.4, plus a replication cluster and a Citus cluster for Portfolio 5. Each portfolio folder has a README, its SQL or scripts, an <code>evidence/</code> folder holding the raw output of its last run, and one <code>run.sh</code> that rebuilds everything from nothing.</p>
+
+<h2>2. The five portfolio activities</h2>
+
+<h3>Portfolio 1: Database design and modelling</h3>
+<p>The relational schema has 16 tables (customers, KYC, wallets, merchants, a double-entry ledger, transfers, deposits, withdrawals, reversals, idempotency keys and an audit log), normalised to BCNF in <code>normalisation.md</code>. Money is stored as whole kobo in <code>BIGINT</code>; the ledger is append-only and double-entry, with each transaction's entries netting to zero; and requests such as transfers are kept separate from posted entries, so a failed request moves no money.</p>
+<p>Rules are enforced with primary keys, foreign keys, <code>UNIQUE</code>, expression and partial unique indexes, <code>CHECK</code> constraints, and deferred constraint triggers. <b>All 31 constraint tests pass</b>, and the ER diagrams are generated from Mermaid source.</p>
+<figure><img src="../portfolio-1-database-design/er-view-2-ledger-operations.png" style="width:100%"><figcaption>Figure 1. Portfolio 1 ER view of the ledger and money operations (full diagram in the repository).</figcaption></figure>
+
+<h3>Portfolio 2: Query processing and optimisation</h3>
+<p>A seeded generator produced a year of activity: 100,000 customers, 2.08 million ledger transactions and 4.16 million entries. Eleven queries tied to real operations were each timed five times (median), before and after indexing, using <code>EXPLAIN (ANALYZE, BUFFERS)</code>. Four further experiments compared B-tree, BRIN and partial indexes, partitioning, and the planner's estimates.</p>
+<table>
+  <tr><th>Query</th><th>Before (ms)</th><th>After (ms)</th><th>What changed</th></tr>
+  <tr><td>Q1b customer statement, rewritten</td><td class="n">208.0</td><td class="n">0.42</td><td>Covering index matching <code>ORDER BY … LIMIT</code>: 499 times faster</td></tr>
+  <tr><td>Q7 three-hop money trail (recursive)</td><td class="n">437.4</td><td class="n">0.31</td><td>An index on the recursive join column: 1,430 times faster</td></tr>
+  <tr><td>Q2a/Q2b customer by email</td><td class="n">7.5</td><td class="n">0.09</td><td>Q2a didn't use the <code>lower(email)</code> index until the query was rewritten to match it</td></tr>
+  <tr><td>Q8 count dormant wallets</td><td class="n">111.3</td><td class="n">157.6</td><td>Slower: an index can't help a query that must read most rows</td></tr>
+</table>
+
+<h3>Portfolio 3: Transactions and concurrency</h3>
+<p>Two-session demonstrations (driven with <code>dblink</code>) show commit, rollback, savepoints and deferred constraints; dirty reads, non-repeatable reads and phantoms at each isolation level; write skew under <code>REPEATABLE READ</code> and its prevention by <code>SERIALIZABLE</code>; deadlock, row locks, optimistic locking and <code>SKIP LOCKED</code>; and crash recovery, where the server was killed with SIGKILL and recovered through WAL replay.</p>
+<p>Triggers now enforce the three rules Portfolio 1 left open. A <code>transfer()</code> procedure locks both wallets in <code>wallet_id</code> order and uses idempotency keys. 17 rule tests pass. In 15-second stress runs (16 clients, 20 wallets):</p>
+<table>
+  <tr><th>Code</th><th>Isolation</th><th>Transfers per second</th><th>Money created from nothing</th></tr>
+  <tr><td>Naive read-then-write</td><td>Read committed</td><td class="n">36</td><td><b>2,184,302 kobo</b> (lost updates); 20 of 20 balances wrong</td></tr>
+  <tr><td>Naive read-then-write</td><td>Serializable</td><td class="n">26</td><td>0, but 53% of transactions failed after 10 retries</td></tr>
+  <tr><td><b><code>transfer()</code></b></td><td>Read committed + ordered row locks</td><td class="n"><b>1,686</b></td><td><b>0</b>, with no deadlocks and no retries</td></tr>
+</table>
+
+<h3>Portfolio 4: NoSQL and advanced data models</h3>
+<p>MongoDB holds four <code>$jsonSchema</code>-validated collections loaded from PostgreSQL. The counts match exactly: 100,003 customers, 882,099 statement entries and 127,410 transfers.</p>
+<p>Customers embed their wallet and KYC history; statements use the bucket pattern (one document per wallet per month, at most 500 entries); transfers are graph edges for <code>$graphLookup</code>; audit events have flexible fields and a TTL index.</p>
+<p><b>Indexing:</b> a money-trail traversal fell from 13,050 ms to 18 ms, while an aggregation over 246,631 entries didn't improve, because unwinding them all costs more than finding them.</p>
+<p><b>Single-document atomicity:</b> 50 concurrent payment requests were sent against a daily limit. The naive version approved all 50, putting spending N50,000 over the limit. A single atomic update approved exactly 25.</p>
+<p><b>Redis:</b> idempotency claims (<code>SET NX</code>: 1 of 20 identical requests won), fixed-window and Lua sliding-window rate limits, sessions, cache-aside with invalidation, and a capped activity feed.</p>
+<p><b>Suitability:</b> the ledger stays relational. MongoDB serves read models and Redis holds short-lived state (polyglot persistence). A Cassandra table was designed but not run.</p>
+
+<h3>Portfolio 5: Distributed and cloud databases</h3>
+<p><b>Replication:</b> three PostgreSQL nodes with a synchronous and an asynchronous standby. The primary was killed while the application was sending transfers.</p>
+<p><b>The synchronous standby held all 264 confirmed transfers</b>, so nothing was lost; the lagging asynchronous standby held none of them. Recovery took 10.6 s, 9.7 s of which was failure detection. Waiting for a standby 10 ms away raised commit latency from 4.1 ms to 20.0 ms. With the only synchronous standby down, commits blocked; quorum commit (<code>ANY 1 of 2</code>) kept them flowing. A restarted old primary caused real <b>split brain</b>: it committed a transfer that reused an ID already issued by the new primary, and <code>pg_rewind</code> then turned it back into a standby.</p>
+<p><b>Sharding (Citus, the 4.2 million-entry data set, sharded on <code>wallet_id</code>):</b></p>
+<p>Statements became single-shard router queries. A fan-out aggregation ran in 1.49 s, against 2.65 s on one server, while a join on a column that isn't the shard key took 24.4 s, against 0.89 s. 97% of real transfers span shards and commit with two-phase commit (<code>PREPARE TRANSACTION</code>, then <code>COMMIT PREPARED</code>). A failed worker made its shards unavailable rather than returning wrong answers. Adding a worker moved shards in 143 s while 18,373 transfers committed with 0 failures.</p>
+<p>The README relates each result to CAP and PACELC and proposes the cloud deployment in Figure 2.</p>
+
+<figure><img src="../portfolio-5-distributed-cloud/deployment.png" style="width:50%"><figcaption>Figure 2. Proposed deployment (Portfolio 5): a quorum of synchronous standbys across zones, an asynchronous disaster-recovery standby in a second region, and a WAL archive.</figcaption></figure>
+
+<h3>Sample evidence (extract from <code>portfolio-5-distributed-cloud/evidence/r5_failover.txt</code>)</h3>
+<pre>Every transfer node1 confirmed before it died, looked up on the other nodes:
+[node2] ... confirmed_by_node1 | missing_here        [node3] ... confirmed_by_node1 | missing_here
+                           264 |            0                                  264 |          264
+Last confirmation from node1: +0.09 s   node2 promoted: +10.26 s   First confirmation from node2: +10.64 s</pre>
+<p>Every figure in this document comes from these evidence files, which the scripts in the repository regenerate. The repository's commits show the portfolio developing from 4 to 10 November 2026: the lab and Portfolio 1 first, then one commit per portfolio.</p>
+
+<h2>3. Individual technical reflection</h2>
+<p><b>Design choices.</b> I chose a wallet because money gives every topic a clear test of correctness: the ledger must always balance, and no transfer may be lost or posted twice. Portfolio 1's double-entry, append-only design made that testable, and each later portfolio was judged against it: a fast query must return the same answer, and a concurrent or distributed run must leave the trial balance at zero. I kept the ledger relational throughout. Portfolio 4 showed that MongoDB and Redis suit the read models and short-lived state, but not the multi-row transactions that move money.</p>
+<p><b>Challenges.</b> Several results only became trustworthy after I questioned them.</p>
+<ul>
+  <li>An early test run reported success with zero tests, because a rollback also erased the results table.</li>
+  <li>My first lost-update demonstration failed for an unexpected reason: the CHECK constraint fired before the second session even waited for the lock.</li>
+  <li>In Portfolio 5, failover detection first looked slow because of Docker's DNS, not PostgreSQL. Using fixed IP addresses fixed the measurement.</li>
+  <li>A Citus placement view returned no rows because each worker gives the same table a different internal OID.</li>
+  <li>During one stress run, PostgreSQL raised an internal error (<code>new multixact has more than one updating member</code>). I recorded it and matched it to an open upstream report rather than claiming to diagnose it.</li>
+</ul>
+<p><b>Lessons learned.</b></p>
+<ul>
+  <li>An index helps only when the query is written to use it, and can make a query slower (Q2a and Q8).</li>
+  <li>Correctness under concurrency comes from the right locks, not just a higher isolation level: ordered row locks were both correct and 47 times faster than the naive code.</li>
+  <li>"Synchronous" replication means durable on the standby, not visible there.</li>
+  <li>In a sharded system, the choice of shard key decides which queries scale. Sharding <code>ledger_transactions</code> separately made almost every transfer a distributed transaction, a flaw I would correct by co-locating it with the source wallet.</li>
+  <li>The biggest lesson is to trust measurements over assumptions, and to record surprising results honestly, including those that didn't improve.</li>
+</ul>
+
+<h2>4. AI use declaration</h2>
+<p><b>Tool:</b> Claude Code (Anthropic), using the Claude Opus 5.5 model. The course tutor confirmed that AI could be used for the implementation, provided the use is declared and the student understands the work.</p>
+<p><b>Used for:</b> planning the portfolio; writing the Docker configuration, SQL, MongoDB, Redis and shell scripts, tests and READMEs; running the scripts to capture evidence; and drafting this document. Commits made with the tool carry a <code>Co-Authored-By</code> line.</p>
+<p><b>How the output was reviewed and verified:</b></p>
+<p>Every claim is backed by output from a real run, saved in each <code>evidence/</code> folder and reproducible with <code>run.sh</code>; no result was typed in by hand. Built-in checks make the scripts fail when results are wrong: constraint and rule tests, trial-balance and balance-audit queries, and PostgreSQL/MongoDB count comparisons. Figures in the READMEs were cross-checked against the evidence files, and errors found this way were corrected, for example a wrongly reported entry count in Portfolio 4. I studied each portfolio's concepts and results from my revision notes, so that I can explain and rerun any part of the work.</p>
+
+<h2>5. References</h2>
+<div class="refs">
+<p>Abadi, D. (2012) 'Consistency tradeoffs in modern distributed database system design: CAP is only part of the story', <i>Computer</i>, 45(2), pp. 37–42.</p>
+<p>Cubukcu, U., Erdogan, O., Pathak, S., Sannakkayala, S. and Slot, M. (2021) 'Citus: distributed PostgreSQL for data-intensive applications', <i>Proceedings of SIGMOD '21</i>, pp. 2490–2502.</p>
+<p>Elmasri, R. and Navathe, S.B. (2016) <i>Fundamentals of Database Systems</i>. 7th edn. Boston: Pearson.</p>
+<p>Gilbert, S. and Lynch, N. (2002) 'Brewer's conjecture and the feasibility of consistent, available, partition-tolerant web services', <i>ACM SIGACT News</i>, 33(2), pp. 51–59.</p>
+<p>Kleppmann, M. (2017) <i>Designing Data-Intensive Applications</i>. Sebastopol, CA: O'Reilly Media.</p>
+<p>Ports, D.R.K. and Grittner, K. (2012) 'Serializable Snapshot Isolation in PostgreSQL', <i>Proceedings of the VLDB Endowment</i>, 5(12), pp. 1850–1861.</p>
+<p>Citus Data (2024) <i>Citus 12.1 documentation</i>. Available at: https://docs.citusdata.com/en/v12.1/ (Accessed: 10 November 2026).</p>
+<p>MongoDB, Inc. (2024) <i>MongoDB 7.0 manual</i>. Available at: https://www.mongodb.com/docs/v7.0/ (Accessed: 10 November 2026).</p>
+<p>PostgreSQL Global Development Group (2024) <i>PostgreSQL 16 documentation</i>. Available at: https://www.postgresql.org/docs/16/ (Accessed: 10 November 2026).</p>
+<p>Redis Ltd. (2024) <i>Redis documentation</i>. Available at: https://redis.io/docs/ (Accessed: 10 November 2026).</p>
+<p><i>Tools:</i> Docker/OrbStack, pgbench, dblink, mermaid-cli.</p>
+</div>
+
+</body>
+</html>

@@ -26,6 +26,7 @@ The same case study is used across all five portfolio activities.
 | [portfolio-3-transactions-concurrency](portfolio-3-transactions-concurrency/) | Transactions and Concurrency | 7 |
 | [portfolio-4-nosql](portfolio-4-nosql/) | NoSQL and Advanced Data Models | 7 |
 | [portfolio-5-distributed-cloud](portfolio-5-distributed-cloud/) | Distributed and Cloud Database Exercise | 6 |
+| [final-documentation](final-documentation/) | Final Documentation: the 3-page summary submitted through the LMS ([PDF](final-documentation/Odoh_Ikenna_0310_FinalDocumentation.pdf)) | 6 |
 | [AI_USE_DECLARATION.md](AI_USE_DECLARATION.md) | AI Use Declaration | |
 
 ## Running the lab
