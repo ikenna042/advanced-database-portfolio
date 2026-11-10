@@ -1,0 +1,62 @@
+
+== S5.1 worker2 stops ==
+
+(docker compose stop worker2)
+
+[coordinator] SELECT count(*) AS entries_for_wallet_on_worker1 FROM wallet.ledger_entries WHERE wallet_id = 9
+     entries_for_wallet_on_worker1 
+    -------------------------------
+                              6283
+
+
+[coordinator] SELECT count(*) AS entries_for_wallet_on_worker2 FROM wallet.ledger_entries WHERE wallet_id = 13
+    ERROR:  connection to the remote node kolaro@worker2:5432 failed with the following error: could not translate host name "worker2" to address: Name or service not known
+
+[coordinator] SELECT count(*) AS all_entries FROM wallet.ledger_entries
+    ERROR:  connection to the remote node kolaro@worker2:5432 failed with the following error: could not translate host name "worker2" to address: Name or service not known
+
+Five transfers between two wallets that are both on worker1 (9 and 10). The
+ledger_transactions row for each one goes to the shard that owns its new transaction_id,
+which may be on worker2:
+
+[coordinator] SELECT wallet.transfer_by_id(9, 10, 100)
+    ERROR:  connection to the remote node kolaro@worker2:5432 failed with the following error: could not translate host name "worker2" to address: Name or service not known
+    CONTEXT:  SQL statement "INSERT INTO wallet.ledger_transactions (txn_type, narration)
+        VALUES ('transfer', 'Transfer') RETURNING transaction_id"
+    PL/pgSQL function wallet.transfer_by_id(bigint,bigint,bigint) line 25 at SQL statement
+
+[coordinator] SELECT wallet.transfer_by_id(9, 10, 100)
+     transfer_by_id 
+    ----------------
+     completed
+
+
+[coordinator] SELECT wallet.transfer_by_id(9, 10, 100)
+     transfer_by_id 
+    ----------------
+     completed
+
+
+[coordinator] SELECT wallet.transfer_by_id(9, 10, 100)
+    ERROR:  connection to the remote node kolaro@worker2:5432 failed with the following error: could not translate host name "worker2" to address: Name or service not known
+    CONTEXT:  SQL statement "INSERT INTO wallet.ledger_transactions (txn_type, narration)
+        VALUES ('transfer', 'Transfer') RETURNING transaction_id"
+    PL/pgSQL function wallet.transfer_by_id(bigint,bigint,bigint) line 25 at SQL statement
+
+[coordinator] SELECT wallet.transfer_by_id(9, 10, 100)
+    ERROR:  connection to the remote node kolaro@worker2:5432 failed with the following error: could not translate host name "worker2" to address: Name or service not known
+    CONTEXT:  SQL statement "INSERT INTO wallet.ledger_transactions (txn_type, narration)
+        VALUES ('transfer', 'Transfer') RETURNING transaction_id"
+    PL/pgSQL function wallet.transfer_by_id(bigint,bigint,bigint) line 25 at SQL statement
+
+
+== S5.2 worker2 restarts ==
+
+(docker compose start worker2)
+
+[coordinator] SELECT count(*) AS all_entries FROM wallet.ledger_entries
+     all_entries 
+    -------------
+         4170774
+
+

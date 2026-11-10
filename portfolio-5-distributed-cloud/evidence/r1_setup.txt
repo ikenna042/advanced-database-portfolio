@@ -1,0 +1,115 @@
+
+== Nodes ==
+
+node1 was created with initdb. node2 and node3 were cloned from it with pg_basebackup
+and stream its write-ahead log (WAL). The schema and data were then loaded on node1 only.
+synchronous_standby_names on node1 is 'FIRST 1 (node2)': a commit waits until node2 has
+the WAL on disk. node3 is asynchronous.
+
+[node1] SELECT current_setting('cluster_name') AS node, version() ~ 'PostgreSQL 16' AS pg16,
+                 CASE WHEN pg_is_in_recovery() THEN 'standby' ELSE 'primary' END AS role
+     node  | pg16 |  role   
+    -------+------+---------
+     node1 | t    | primary
+
+
+[node2] SELECT current_setting('cluster_name') AS node, version() ~ 'PostgreSQL 16' AS pg16,
+                 CASE WHEN pg_is_in_recovery() THEN 'standby' ELSE 'primary' END AS role
+     node  | pg16 |  role   
+    -------+------+---------
+     node2 | t    | standby
+
+
+[node3] SELECT current_setting('cluster_name') AS node, version() ~ 'PostgreSQL 16' AS pg16,
+                 CASE WHEN pg_is_in_recovery() THEN 'standby' ELSE 'primary' END AS role
+     node  | pg16 |  role   
+    -------+------+---------
+     node3 | t    | standby
+
+
+
+== Replication as node1 sees it ==
+
+[node1] SELECT application_name AS standby, state, sync_state,
+       pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) AS bytes_not_yet_applied
+  FROM pg_stat_replication ORDER BY 1
+     standby |   state   | sync_state | bytes_not_yet_applied 
+    ---------+-----------+------------+-----------------------
+     node2   | streaming | sync       |                     0
+     node3   | streaming | async      |                     0
+
+
+[node1] SELECT slot_name, slot_type, active FROM pg_replication_slots ORDER BY 1
+     slot_name | slot_type | active 
+    -----------+-----------+--------
+     node2     | physical  | t
+     node3     | physical  | t
+
+
+
+== The data arrived on every node ==
+
+[node1] SELECT (SELECT count(*) FROM wallet.wallets) AS wallets, (SELECT count(*) FROM wallet.ledger_entries) AS ledger_entries,
+                 (SELECT sum(balance_kobo) FROM wallet.wallets WHERE wallet_number LIKE '30%') AS stress_wallets_total_kobo
+     wallets | ledger_entries | stress_wallets_total_kobo 
+    ---------+----------------+---------------------------
+          27 |             36 |                  20000000
+
+
+[node2] SELECT (SELECT count(*) FROM wallet.wallets) AS wallets, (SELECT count(*) FROM wallet.ledger_entries) AS ledger_entries,
+                 (SELECT sum(balance_kobo) FROM wallet.wallets WHERE wallet_number LIKE '30%') AS stress_wallets_total_kobo
+     wallets | ledger_entries | stress_wallets_total_kobo 
+    ---------+----------------+---------------------------
+          27 |             36 |                  20000000
+
+
+[node3] SELECT (SELECT count(*) FROM wallet.wallets) AS wallets, (SELECT count(*) FROM wallet.ledger_entries) AS ledger_entries,
+                 (SELECT sum(balance_kobo) FROM wallet.wallets WHERE wallet_number LIKE '30%') AS stress_wallets_total_kobo
+     wallets | ledger_entries | stress_wallets_total_kobo 
+    ---------+----------------+---------------------------
+          27 |             36 |                  20000000
+
+
+
+== Standbys accept reads but refuse writes ==
+
+[node2] UPDATE wallet.wallets SET status = 'frozen' WHERE wallet_number = '3100000001'
+    ERROR:  cannot execute UPDATE in a read-only transaction
+
+[node3] SELECT * FROM wallet.transfer('3100000001', '3100000002', 1000, 'r1-on-standby')
+    ERROR:  cannot execute INSERT in a read-only transaction
+    CONTEXT:  SQL statement "INSERT INTO idempotency_keys (customer_id, idempotency_key, request_hash)
+        VALUES (v_source.customer_id, p_idempotency_key, v_hash)
+        ON CONFLICT DO NOTHING"
+    PL/pgSQL function transfer(character,character,bigint,text,text) line 30 at SQL statement
+
+
+== A transfer committed on node1 is readable on both standbys ==
+
+[node1] SELECT transfer_id, status FROM wallet.transfer('3100000001', '3100000002', 250000, 'r1-transfer')
+     transfer_id |  status   
+    -------------+-----------
+               5 | completed
+
+
+[node1] SELECT wallet_number, balance_kobo FROM wallet.wallets WHERE wallet_number IN ('3100000001', '3100000002') ORDER BY 1
+     wallet_number | balance_kobo 
+    ---------------+--------------
+     3100000001    |      4750000
+     3100000002    |      5250000
+
+
+[node2] SELECT wallet_number, balance_kobo FROM wallet.wallets WHERE wallet_number IN ('3100000001', '3100000002') ORDER BY 1
+     wallet_number | balance_kobo 
+    ---------------+--------------
+     3100000001    |      4750000
+     3100000002    |      5250000
+
+
+[node3] SELECT wallet_number, balance_kobo FROM wallet.wallets WHERE wallet_number IN ('3100000001', '3100000002') ORDER BY 1
+     wallet_number | balance_kobo 
+    ---------------+--------------
+     3100000001    |      4750000
+     3100000002    |      5250000
+
+

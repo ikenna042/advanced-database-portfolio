@@ -1,0 +1,83 @@
+
+== S6.1 Before ==
+
+[coordinator] SELECT nodename, count(*) AS shards, count(DISTINCT colocation_id) AS shard_groups,
+       pg_size_pretty(sum(shard_size)) AS data
+  FROM citus_shards WHERE citus_table_type = 'distributed' GROUP BY nodename ORDER BY nodename
+     nodename | shards | shard_groups |  data  
+    ----------+--------+--------------+--------
+     worker1  |     80 |            3 | 581 MB
+     worker2  |     80 |            3 | 668 MB
+
+
+[coordinator] SELECT (SELECT count(*) FROM wallet.ledger_entries) AS ledger_entries,
+       (SELECT sum(amount_kobo) FROM wallet.ledger_entries) AS ledger_net_kobo,
+       (SELECT sum(balance_kobo) FROM wallet.wallets) AS balances_kobo,
+       (SELECT count(*) FROM wallet.transfers) AS transfers
+     ledger_entries | ledger_net_kobo | balances_kobo | transfers 
+    ----------------+-----------------+---------------+-----------
+            4170774 |               0 |             0 |   1545955
+
+
+
+== S6.2 Add worker3 and move shards to it, online ==
+
+[coordinator] SELECT citus_add_node('worker3', 5432)
+     citus_add_node 
+    ----------------
+                  4
+
+
+While the shards move, 4 pgbench clients keep sending cross-worker transfers.
+
+[coordinator] SELECT citus_rebalance_start(shard_transfer_mode => 'force_logical')
+    NOTICE:  Scheduled 30 moves as job 1
+    DETAIL:  Rebalance scheduled as background job
+    HINT:  To monitor progress, run: SELECT * FROM citus_rebalance_status();
+     citus_rebalance_start 
+    -----------------------
+                         1
+
+
+[coordinator] SELECT citus_rebalance_wait()
+     citus_rebalance_wait 
+    ----------------------
+     
+
+
+Rebalance took 143 seconds.
+
+pgbench during the rebalance: 27 rounds of 5 s, 18373 transfers committed, 0 failed, 0 client errors
+
+
+== S6.3 After ==
+
+[coordinator] SELECT nodename, count(*) AS shards, count(DISTINCT colocation_id) AS shard_groups,
+       pg_size_pretty(sum(shard_size)) AS data
+  FROM citus_shards WHERE citus_table_type = 'distributed' GROUP BY nodename ORDER BY nodename
+     nodename | shards | shard_groups |  data  
+    ----------+--------+--------------+--------
+     worker1  |     55 |            3 | 402 MB
+     worker2  |     55 |            3 | 391 MB
+     worker3  |     50 |            3 | 470 MB
+
+
+The totals changed only by the transfers made during the move (1 kobo each, so the
+ledger still nets to the same amount and every balance still matches its entries):
+
+[coordinator] SELECT (SELECT count(*) FROM wallet.ledger_entries) AS ledger_entries,
+       (SELECT sum(amount_kobo) FROM wallet.ledger_entries) AS ledger_net_kobo,
+       (SELECT sum(balance_kobo) FROM wallet.wallets) AS balances_kobo,
+       (SELECT count(*) FROM wallet.transfers) AS transfers
+     ledger_entries | ledger_net_kobo | balances_kobo | transfers 
+    ----------------+-----------------+---------------+-----------
+            4207520 |               0 |             0 |   1564328
+
+
+[coordinator] SELECT count(*) AS wallets, count(*) FILTER (WHERE w.balance_kobo <> l.total) AS balance_mismatches
+         FROM wallet.wallets w JOIN (SELECT wallet_id, sum(amount_kobo) AS total FROM wallet.ledger_entries GROUP BY wallet_id) l USING (wallet_id)
+     wallets | balance_mismatches 
+    ---------+--------------------
+      102004 |                  0
+
+

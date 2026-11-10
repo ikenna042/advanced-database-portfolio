@@ -1,4 +1,5 @@
-# Core lab for the MIT 8103 portfolio. Replication and Citus services are added in Portfolio 5.
+# Core lab for the MIT 8103 portfolio. Portfolio 5 has its own replication and Citus clusters
+# in portfolio-5-distributed-cloud/replication and /sharding.
 # Ports are bound to localhost only and the passwords are for this local lab, not for real use.
 name: kolaro-lab
 

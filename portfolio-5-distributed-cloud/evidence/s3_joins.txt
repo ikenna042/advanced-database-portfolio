@@ -1,0 +1,101 @@
+
+== S3.1 Co-located join: balance audit (wallets with ledger_entries, both sharded on wallet_id) ==
+
+Each worker joins its own wallet shards with the matching entry shards. Nothing moves
+between workers except the per-shard counts.
+
+[coordinator] EXPLAIN (COSTS OFF) SELECT count(*) AS wallets, count(*) FILTER (WHERE w.balance_kobo <> l.total) AS balance_mismatches
+         FROM wallet.wallets w JOIN (SELECT wallet_id, sum(amount_kobo) AS total FROM wallet.ledger_entries GROUP BY wallet_id) l USING (wallet_id)
+                                                QUERY PLAN                                            
+    --------------------------------------------------------------------------------------------------
+     Aggregate
+       ->  Custom Scan (Citus Adaptive)
+             Task Count: 32
+             Tasks Shown: One of 32
+             ->  Task
+                   Node: host=worker1 port=5432 dbname=kolaro
+                   ->  Aggregate
+                         ->  Hash Join
+                               Hash Cond: (w.wallet_id = l.wallet_id)
+                               ->  Seq Scan on wallets_102041 w
+                               ->  Hash
+                                     ->  Subquery Scan on l
+                                           ->  HashAggregate
+                                                 Group Key: ledger_entries.wallet_id
+                                                 ->  Seq Scan on ledger_entries_102073 ledger_entries
+
+
+[coordinator] \timing on
+SELECT count(*) AS wallets, count(*) FILTER (WHERE w.balance_kobo <> l.total) AS balance_mismatches
+         FROM wallet.wallets w JOIN (SELECT wallet_id, sum(amount_kobo) AS total FROM wallet.ledger_entries GROUP BY wallet_id) l USING (wallet_id)
+    Timing is on.
+     wallets | balance_mismatches 
+    ---------+--------------------
+      102004 |                  0
+
+    Time: 1462.610 ms (00:01.463)
+
+
+== S3.2 Join with a reference table: October merchant takings by category ==
+
+[coordinator] \timing on
+SELECT m.category, count(*) AS payments, sum(e.amount_kobo) AS received_kobo
+               FROM wallet.ledger_entries e JOIN wallet.wallets w USING (wallet_id) JOIN wallet.merchants m USING (merchant_id)
+              WHERE e.amount_kobo > 0 AND e.created_at >= '2026-10-01' AND e.created_at < '2026-11-01'
+              GROUP BY 1 ORDER BY 3 DESC
+    Timing is on.
+      category   | payments | received_kobo 
+    -------------+----------+---------------
+     fuel        |    12187 |   12199795521
+     restaurant  |    10129 |   10228543468
+     electronics |    10138 |   10180677511
+     pharmacy    |     9631 |    9718305582
+     transport   |     4527 |    4501745919
+     grocery     |     4030 |    4054332628
+
+    Time: 1016.818 ms (00:01.017)
+
+
+== S3.3 Join on a column that is not the shard key: entries with their transactions ==
+
+ledger_entries is sharded on wallet_id and ledger_transactions on transaction_id, so
+matching rows are on different workers.
+
+[coordinator] SELECT t.txn_type, count(*) AS entries
+           FROM wallet.ledger_entries e JOIN wallet.ledger_transactions t USING (transaction_id)
+          WHERE e.created_at >= '2026-10-01' AND e.created_at < '2026-11-01'
+          GROUP BY 1 ORDER BY 1
+    ERROR:  the query contains a join that requires repartitioning
+    HINT:  Set citus.enable_repartition_joins to on to enable repartitioning
+
+Allowing Citus to re-shard both sides on transaction_id for this query (a repartition join):
+
+[coordinator] SET citus.enable_repartition_joins = on;
+\timing on
+SELECT t.txn_type, count(*) AS entries
+           FROM wallet.ledger_entries e JOIN wallet.ledger_transactions t USING (transaction_id)
+          WHERE e.created_at >= '2026-10-01' AND e.created_at < '2026-11-01'
+          GROUP BY 1 ORDER BY 1
+    SET
+    Timing is on.
+      txn_type  | entries 
+    ------------+---------
+     deposit    |   51274
+     transfer   |  254820
+     withdrawal |   33632
+
+    Time: 24357.250 ms (00:24.357)
+
+[single server] SELECT t.txn_type, count(*) AS entries
+           FROM wallet.ledger_entries e JOIN wallet.ledger_transactions t USING (transaction_id)
+          WHERE e.created_at >= '2026-10-01' AND e.created_at < '2026-11-01'
+          GROUP BY 1 ORDER BY 1
+    Timing is on.
+      txn_type  | entries 
+    ------------+---------
+     deposit    |   51274
+     transfer   |  254820
+     withdrawal |   33632
+
+    Time: 886.703 ms
+

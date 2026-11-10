@@ -1,0 +1,112 @@
+
+== R4.1 node2, the only synchronous standby, stops ==
+
+(docker compose stop node2)
+
+[node1] SELECT application_name AS standby, state, sync_state,
+       pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) AS bytes_not_yet_applied
+  FROM pg_stat_replication ORDER BY 1
+     standby |   state   | sync_state | bytes_not_yet_applied 
+    ---------+-----------+------------+-----------------------
+     node3   | streaming | async      |                     0
+
+
+A transfer on node1 is sent in the background. It cannot finish committing, because no
+synchronous standby can confirm it.
+
+[node1] SELECT wait_event, now() - xact_start AS waiting_for, left(query, 40) AS query
+             FROM pg_stat_activity WHERE wait_event = 'SyncRep'
+     wait_event |   waiting_for   |                  query                   
+    ------------+-----------------+------------------------------------------
+     SyncRep    | 00:00:04.057705 | SELECT transfer_id, status FROM wallet.t
+
+
+Other sessions cannot see it yet:
+
+[node1] SELECT count(*) AS visible FROM wallet.idempotency_keys WHERE idempotency_key = 'r4-no-sync-standby'
+     visible 
+    ---------
+           0
+
+
+An operator (or a timeout in the application) cancels the wait:
+
+[node1] SELECT pg_cancel_backend(pid) FROM pg_stat_activity WHERE wait_event = 'SyncRep'
+     pg_cancel_backend 
+    -------------------
+     t
+
+
+[app -> node1] the background transfer returned:
+    WARNING:  canceling wait for synchronous replication due to user request
+    DETAIL:  The transaction has already committed locally, but might not have been replicated to the standby.
+     transfer_id |  status   
+    -------------+-----------
+           33784 | completed
+
+
+The client was told it succeeded, with a warning. The transfer is now visible on node1
+although no synchronous standby has confirmed it:
+
+[node1] SELECT count(*) AS visible FROM wallet.idempotency_keys WHERE idempotency_key = 'r4-no-sync-standby'
+     visible 
+    ---------
+           1
+
+
+
+== R4.2 Quorum commit: any 1 of node2 and node3 ==
+
+[node1] ALTER SYSTEM SET synchronous_standby_names = 'ANY 1 (node2, node3)'
+    ALTER SYSTEM
+
+[node1] SELECT pg_reload_conf()
+     pg_reload_conf 
+    ----------------
+     t
+
+
+[node1] SELECT application_name AS standby, state, sync_state,
+       pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) AS bytes_not_yet_applied
+  FROM pg_stat_replication ORDER BY 1
+     standby |   state   | sync_state | bytes_not_yet_applied 
+    ---------+-----------+------------+-----------------------
+     node3   | streaming | quorum     |                     0
+
+
+[node1] SELECT transfer_id, status FROM wallet.transfer('3100000001', '3100000002', 100000, 'r4-quorum')
+     transfer_id |  status   
+    -------------+-----------
+           33785 | completed
+
+
+
+== R4.3 node2 comes back and catches up from its replication slot ==
+
+(docker compose start node2)
+
+[node1] SELECT application_name AS standby, state, sync_state,
+       pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) AS bytes_not_yet_applied
+  FROM pg_stat_replication ORDER BY 1
+     standby |   state   | sync_state | bytes_not_yet_applied 
+    ---------+-----------+------------+-----------------------
+     node2   | streaming | quorum     |                     0
+     node3   | streaming | quorum     |                     0
+
+
+[node2] SELECT idempotency_key FROM wallet.idempotency_keys WHERE idempotency_key LIKE 'r4-%' ORDER BY 1
+      idempotency_key   
+    --------------------
+     r4-no-sync-standby
+     r4-quorum
+
+
+[node1] ALTER SYSTEM SET synchronous_standby_names = 'FIRST 1 (node2)'
+    ALTER SYSTEM
+
+[node1] SELECT pg_reload_conf()
+     pg_reload_conf 
+    ----------------
+     t
+
+

@@ -1,0 +1,28 @@
+
+== Commit cost by synchronous_commit level ==
+
+pgbench, 1 client for 8 seconds per row, running Portfolio 3's transfer() between the 20
+stress wallets. With one client nothing waits for locks, so the latency is the work plus
+the commit. node2 is the synchronous standby; node3 is asynchronous.
+
+  off           commit returns before the WAL is flushed even on node1 (a crash can lose the last moments)
+  local         waits for node1's own disk only; standbys are not waited for
+  remote_write  also waits until node2 has received the WAL and handed it to its operating system
+  on            also waits until node2 has flushed it to disk (the default)
+  remote_apply  also waits until node2 has applied it, so a read on node2 sees the commit
+
+node1 -> node2 before: round-trip min/avg/max = 0.209/0.439/0.771 ms
+
+network to node2       level         per second   latency ms
+same host              off                1100         0.91
+same host              local               319         3.14
+same host              remote_write        334         3.00
+same host              on                  196         5.10
+same host              remote_apply        230         4.35
++10 ms (another zone)  off                 976         1.02
++10 ms (another zone)  local               246         4.07
++10 ms (another zone)  remote_write         59        17.03
++10 ms (another zone)  on                   50        19.97
++10 ms (another zone)  remote_apply         50        19.98
+
+node1 -> node2 with delay: round-trip min/avg/max = 10.787/12.478/13.621 ms

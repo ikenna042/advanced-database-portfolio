@@ -1,0 +1,109 @@
+
+== S2.1 A customer statement: one wallet, so one shard ==
+
+[coordinator] SELECT wallet_id, shardid, nodename FROM wallet.wallet_placement WHERE wallet_id = 50000
+     wallet_id | shardid | nodename 
+    -----------+---------+----------
+         50000 |  102060 | worker2
+
+
+[coordinator] EXPLAIN (ANALYZE, COSTS OFF, SUMMARY OFF) SELECT created_at, amount_kobo FROM wallet.ledger_entries WHERE wallet_id = 50000 ORDER BY created_at DESC LIMIT 50
+                                                                              QUERY PLAN                                                                          
+    --------------------------------------------------------------------------------------------------------------------------------------------------------------
+     Custom Scan (Citus Adaptive) (actual time=172.659..172.706 rows=27 loops=1)
+       Task Count: 1
+       Tuple data received from nodes: 432 bytes
+       Tasks Shown: All
+       ->  Task
+             Tuple data received from node: 432 bytes
+             Node: host=worker2 port=5432 dbname=kolaro
+             ->  Limit (actual time=0.722..0.794 rows=27 loops=1)
+                   ->  Index Only Scan using ledger_entries_wallet_time_102092 on ledger_entries_102092 ledger_entries (actual time=0.608..0.613 rows=27 loops=1)
+                         Index Cond: (wallet_id = 50000)
+                         Heap Fetches: 0
+
+
+[coordinator] \timing on
+SELECT created_at, amount_kobo FROM wallet.ledger_entries WHERE wallet_id = 50000 ORDER BY created_at DESC LIMIT 50
+    Timing is on.
+    Time: 169.045 ms
+
+
+== S2.2 Monthly volumes: every shard, in parallel ==
+
+[coordinator] EXPLAIN (ANALYZE, COSTS OFF, SUMMARY OFF) SELECT date_trunc('month', created_at) AS month, count(*) AS entries, sum(amount_kobo) FILTER (WHERE amount_kobo > 0) AS credited_kobo
+           FROM wallet.ledger_entries GROUP BY 1 ORDER BY 1
+                                                                QUERY PLAN                                                            
+    ----------------------------------------------------------------------------------------------------------------------------------
+     Sort (actual time=2571.224..2571.286 rows=18 loops=1)
+       Sort Key: remote_scan.month
+       Sort Method: quicksort  Memory: 25kB
+       ->  HashAggregate (actual time=2569.845..2570.270 rows=18 loops=1)
+             Group Key: remote_scan.month
+             Batches: 1  Memory Usage: 48kB
+             ->  Custom Scan (Citus Adaptive) (actual time=2566.543..2566.628 rows=552 loops=1)
+                   Task Count: 32
+                   Tuple data received from nodes: 16 kB
+                   Tasks Shown: One of 32
+                   ->  Task
+                         Tuple data received from node: 536 bytes
+                         Node: host=worker2 port=5432 dbname=kolaro
+                         ->  HashAggregate (actual time=2380.497..2382.675 rows=18 loops=1)
+                               Group Key: date_trunc('month'::text, created_at)
+                               Batches: 1  Memory Usage: 1561kB
+                               ->  Seq Scan on ledger_entries_102074 ledger_entries (actual time=1.601..2003.867 rows=682926 loops=1)
+
+
+[coordinator] \timing on
+SELECT date_trunc('month', created_at) AS month, count(*) AS entries, sum(amount_kobo) FILTER (WHERE amount_kobo > 0) AS credited_kobo
+           FROM wallet.ledger_entries GROUP BY 1 ORDER BY 1
+    Timing is on.
+             month          | entries | credited_kobo 
+    ------------------------+---------+---------------
+     2025-06-01 00:00:00+00 |   31174 |  146262694444
+     2025-07-01 00:00:00+00 |   32626 |  152023133795
+     2025-08-01 00:00:00+00 |   32130 |  147310905762
+     2025-09-01 00:00:00+00 |   30994 |  144189889581
+     2025-10-01 00:00:00+00 |   29062 |  135642714608
+     2025-11-01 00:00:00+00 |  328766 |  533360934510
+     2025-12-01 00:00:00+00 |  339726 |  549222891765
+     2026-01-01 00:00:00+00 |  339726 |  547905577482
+     2026-02-01 00:00:00+00 |  306850 |  495415993526
+     2026-03-01 00:00:00+00 |  339726 |  543693898100
+     2026-04-01 00:00:00+00 |  328766 |  528934516258
+     2026-05-01 00:00:00+00 |  339726 |  547260955904
+     2026-06-01 00:00:00+00 |  328768 |  530580367334
+     2026-07-01 00:00:00+00 |  339726 |  547162012651
+     2026-08-01 00:00:00+00 |  339726 |  546463198344
+     2026-09-01 00:00:00+00 |  328766 |  530009015682
+     2026-10-01 00:00:00+00 |  339726 |  547550955200
+     2026-11-01 00:00:00+00 |      16 |      15062857
+
+    Time: 1489.953 ms (00:01.490)
+
+[single server] SELECT date_trunc('month', created_at) AS month, count(*) AS entries, sum(amount_kobo) FILTER (WHERE amount_kobo > 0) AS credited_kobo
+           FROM wallet.ledger_entries GROUP BY 1 ORDER BY 1
+    Timing is on.
+             month          | entries | credited_kobo 
+    ------------------------+---------+---------------
+     2025-06-01 00:00:00+00 |   31174 |  146262694444
+     2025-07-01 00:00:00+00 |   32626 |  152023133795
+     2025-08-01 00:00:00+00 |   32130 |  147310905762
+     2025-09-01 00:00:00+00 |   30994 |  144189889581
+     2025-10-01 00:00:00+00 |   29062 |  135642714608
+     2025-11-01 00:00:00+00 |  328766 |  533360934510
+     2025-12-01 00:00:00+00 |  339726 |  549222891765
+     2026-01-01 00:00:00+00 |  339726 |  547905577482
+     2026-02-01 00:00:00+00 |  306850 |  495415993526
+     2026-03-01 00:00:00+00 |  339726 |  543693898100
+     2026-04-01 00:00:00+00 |  328766 |  528934516258
+     2026-05-01 00:00:00+00 |  339726 |  547260955904
+     2026-06-01 00:00:00+00 |  328768 |  530580367334
+     2026-07-01 00:00:00+00 |  339726 |  547162012651
+     2026-08-01 00:00:00+00 |  339726 |  546463198344
+     2026-09-01 00:00:00+00 |  328766 |  530009015682
+     2026-10-01 00:00:00+00 |  339726 |  547550955200
+     2026-11-01 00:00:00+00 |      16 |      15062857
+
+    Time: 2653.991 ms (00:02.654)
+

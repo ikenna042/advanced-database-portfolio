@@ -1,0 +1,39 @@
+# Portfolio 5 sharding lab: a Citus 12.1 cluster (PostgreSQL 16) with one coordinator and
+# three workers. run.sh registers worker1 and worker2 first, then adds worker3 to show a
+# rebalance. Citus publishes images for x86-64 only, so on Apple silicon these containers
+# run under emulation, and their timings are slower than native.
+#
+# Lab-only shortcut: nodes trust any connection from inside this Docker network, so Citus
+# can connect between nodes without a password. No port is published to the host; use
+# "docker compose exec coordinator psql -U kolaro kolaro". A real cluster would use
+# passwords or certificates (Citus reads them from pg_dist_authinfo) and TLS.
+name: kolaro-p5-sharding
+
+x-citus: &citus
+  image: citusdata/citus:12.1
+  platform: linux/amd64
+  environment:
+    POSTGRES_DB: kolaro
+    POSTGRES_USER: kolaro
+    POSTGRES_HOST_AUTH_METHOD: trust
+  # wal_level=logical lets the rebalancer move shards online with logical replication.
+  command: ["postgres", "-c", "wal_level=logical", "-c", "max_connections=200"]
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U kolaro -d kolaro"]
+    interval: 2s
+    timeout: 3s
+    retries: 60
+
+services:
+  coordinator:
+    <<: *citus
+    hostname: coordinator
+  worker1:
+    <<: *citus
+    hostname: worker1
+  worker2:
+    <<: *citus
+    hostname: worker2
+  worker3:
+    <<: *citus
+    hostname: worker3

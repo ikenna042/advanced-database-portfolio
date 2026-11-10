@@ -1,0 +1,130 @@
+
+== R2.1 Lag while node1 is busy: 8 clients sending transfers for 10 seconds ==
+
+Sampled once a second on node1. write/flush/replay lag is how long the standby took to
+write, flush and apply recent WAL. bytes_not_yet_applied is how far behind node1 it is.
+
+08:33:13  node2 sync: write 0.28 ms, flush 2.09 ms, replay 3.06 ms, 0 bytes behind | node3 async: write 0.23 ms, flush 5.01 ms, replay 5.01 ms, 2288 bytes behind
+08:33:14  node2 sync: write 0.66 ms, flush 1.45 ms, replay 1.86 ms, 0 bytes behind | node3 async: write 0.29 ms, flush 1.96 ms, replay 2.08 ms, 0 bytes behind
+08:33:16  node2 sync: write 0.60 ms, flush 0.60 ms, replay 0.60 ms, 9336 bytes behind | node3 async: write 1.08 ms, flush 1.08 ms, replay 1.08 ms, 9336 bytes behind
+08:33:17  node2 sync: write 0.55 ms, flush 0.55 ms, replay 0.55 ms, 2008 bytes behind | node3 async: write 2.48 ms, flush 2.49 ms, replay 2.60 ms, 0 bytes behind
+08:33:18  node2 sync: write 1.06 ms, flush 1.59 ms, replay 3.65 ms, 0 bytes behind | node3 async: write 0.83 ms, flush 4.37 ms, replay 5.44 ms, 7704 bytes behind
+08:33:19  node2 sync: write 0.10 ms, flush 0.93 ms, replay 0.95 ms, 0 bytes behind | node3 async: write 0.23 ms, flush 0.23 ms, replay 1.81 ms, 2048 bytes behind
+08:33:21  node2 sync: write 2.60 ms, flush 7.10 ms, replay 8.67 ms, 1248 bytes behind | node3 async: write 0.40 ms, flush 0.40 ms, replay 0.40 ms, 656 bytes behind
+08:33:22  node2 sync: write 0.06 ms, flush 0.06 ms, replay 0.06 ms, 416 bytes behind | node3 async: write 0.09 ms, flush 0.09 ms, replay 3.96 ms, 416 bytes behind
+
+number of transactions actually processed: 5318
+tps = 533.000530 (without initial connection time)
+
+== R2.2 A stale read from an asynchronous standby ==
+
+node3's replay is paused to stand in for a slow or distant replica. It keeps receiving WAL.
+
+[node3] SELECT pg_wal_replay_pause()
+     pg_wal_replay_pause 
+    ---------------------
+     
+
+
+[node1] SELECT transfer_id, status FROM wallet.transfer('3100000001', '3100000002', 500000, 'r2-stale-read')
+     transfer_id |  status   
+    -------------+-----------
+            5324 | completed
+
+
+[node1] SELECT wallet_number, balance_kobo FROM wallet.wallets WHERE wallet_number IN ('3100000001', '3100000002') ORDER BY 1
+     wallet_number | balance_kobo 
+    ---------------+--------------
+     3100000001    |      4250000
+     3100000002    |      5750000
+
+
+[node2] SELECT wallet_number, balance_kobo FROM wallet.wallets WHERE wallet_number IN ('3100000001', '3100000002') ORDER BY 1
+     wallet_number | balance_kobo 
+    ---------------+--------------
+     3100000001    |      4250000
+     3100000002    |      5750000
+
+
+[node3] SELECT wallet_number, balance_kobo FROM wallet.wallets WHERE wallet_number IN ('3100000001', '3100000002') ORDER BY 1
+     wallet_number | balance_kobo 
+    ---------------+--------------
+     3100000001    |      4750000
+     3100000002    |      5250000
+
+
+[node3] SELECT pg_last_wal_receive_lsn() AS received, pg_last_wal_replay_lsn() AS applied,
+                  pg_wal_lsn_diff(pg_last_wal_receive_lsn(), pg_last_wal_replay_lsn()) AS bytes_received_not_applied,
+                  now() - pg_last_xact_replay_timestamp() AS showing_data_as_of_this_long_ago
+     received  |  applied  | bytes_received_not_applied | showing_data_as_of_this_long_ago 
+    -----------+-----------+----------------------------+----------------------------------
+     0/4C4B498 | 0/4C4A9E0 |                       2744 | 00:00:02.876488
+
+
+[node3] SELECT pg_wal_replay_resume()
+     pg_wal_replay_resume 
+    ----------------------
+     
+
+
+[node3] SELECT wallet_number, balance_kobo FROM wallet.wallets WHERE wallet_number IN ('3100000001', '3100000002') ORDER BY 1
+     wallet_number | balance_kobo 
+    ---------------+--------------
+     3100000001    |      4250000
+     3100000002    |      5750000
+
+
+
+== R2.3 Even the synchronous standby can serve a stale read ==
+
+synchronous_commit = on (the default) waits until node2 has flushed the WAL, not until it
+has applied it. With node2's replay paused, a commit on node1 still returns at once:
+
+[node2] SELECT pg_wal_replay_pause()
+     pg_wal_replay_pause 
+    ---------------------
+     
+
+
+[node1] SELECT transfer_id, status FROM wallet.transfer('3100000001', '3100000002', 100000, 'r2-sync-flush')
+     transfer_id |  status   
+    -------------+-----------
+            5325 | completed
+
+
+[node2] SELECT wallet_number, balance_kobo FROM wallet.wallets WHERE wallet_number IN ('3100000001', '3100000002') ORDER BY 1
+     wallet_number | balance_kobo 
+    ---------------+--------------
+     3100000001    |      4250000
+     3100000002    |      5750000
+
+
+synchronous_commit = remote_apply waits until node2 has applied it. The same kind of
+transfer now waits. After 3 seconds node2's replay is resumed:
+
+[node1] SELECT application_name, wait_event_type, wait_event, now() - xact_start AS waiting_for
+             FROM pg_stat_activity WHERE wait_event = 'SyncRep'
+     application_name | wait_event_type | wait_event |   waiting_for   
+    ------------------+-----------------+------------+-----------------
+     psql             | IPC             | SyncRep    | 00:00:03.063671
+
+
+[node2] SELECT pg_wal_replay_resume()
+     pg_wal_replay_resume 
+    ----------------------
+     
+
+
+[app -> node1, synchronous_commit=remote_apply] the waiting transfer returned:
+     transfer_id |  status   
+    -------------+-----------
+            5326 | completed
+
+
+[node2] SELECT wallet_number, balance_kobo FROM wallet.wallets WHERE wallet_number IN ('3100000001', '3100000002') ORDER BY 1
+     wallet_number | balance_kobo 
+    ---------------+--------------
+     3100000001    |      4050000
+     3100000002    |      5950000
+
+

@@ -1,0 +1,167 @@
+
+== S4.1 Both wallets in the same shard ==
+
+[coordinator] SELECT wallet_id, balance_kobo, nodename FROM wallet.wallet_placement WHERE wallet_id IN (26, 101870) ORDER BY 1
+     wallet_id | balance_kobo | nodename 
+    -----------+--------------+----------
+            26 |    116457657 | worker2
+        101870 |    187973328 | worker2
+
+
+citus.log_remote_commands shows every command the coordinator sends to a worker:
+
+[coordinator] SET citus.log_remote_commands = on;
+SELECT wallet.transfer_by_id(26, 101870, 1000)
+    SET
+    NOTICE:  issuing BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;SELECT assign_distributed_transaction_id(0, 38, '2026-11-10 08:56:13.386223+00');
+    DETAIL:  on server kolaro@worker2:5432 connectionId: 1
+    NOTICE:  issuing SELECT 1 FROM wallet.wallets_102044 wallets WHERE (wallet_id OPERATOR(pg_catalog.=) '26'::bigint) FOR UPDATE OF wallets
+    DETAIL:  on server kolaro@worker2:5432 connectionId: 1
+    NOTICE:  issuing SELECT 1 FROM wallet.wallets_102044 wallets WHERE (wallet_id OPERATOR(pg_catalog.=) '101870'::bigint) FOR UPDATE OF wallets
+    DETAIL:  on server kolaro@worker2:5432 connectionId: 1
+    NOTICE:  issuing SELECT balance_kobo, status FROM wallet.wallets_102044 wallets WHERE (wallet_id OPERATOR(pg_catalog.=) '26'::bigint)
+    DETAIL:  on server kolaro@worker2:5432 connectionId: 1
+    NOTICE:  issuing BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;SELECT assign_distributed_transaction_id(0, 38, '2026-11-10 08:56:13.386223+00');
+    DETAIL:  on server kolaro@worker1:5432 connectionId: 2
+    NOTICE:  issuing INSERT INTO wallet.ledger_transactions_102153 (transaction_id, txn_type, narration, created_at) VALUES ('2078001'::bigint, 'transfer'::text, 'Transfer'::text, '2026-11-10 08:56:13.346813+00'::timestamp with time zone) RETURNING transaction_id
+    DETAIL:  on server kolaro@worker1:5432 connectionId: 2
+    NOTICE:  issuing INSERT INTO wallet.ledger_entries_102076 (entry_id, transaction_id, wallet_id, amount_kobo, created_at) VALUES ('4156012'::bigint, '2078001'::bigint, '26'::bigint, '-1000'::bigint, '2026-11-10 08:56:13.346813+00'::timestamp with time zone)
+    DETAIL:  on server kolaro@worker2:5432 connectionId: 1
+    NOTICE:  issuing INSERT INTO wallet.ledger_entries_102076 (entry_id, transaction_id, wallet_id, amount_kobo, created_at) VALUES ('4156013'::bigint, '2078001'::bigint, '101870'::bigint, '1000'::bigint, '2026-11-10 08:56:13.346813+00'::timestamp with time zone)
+    DETAIL:  on server kolaro@worker2:5432 connectionId: 1
+    NOTICE:  issuing UPDATE wallet.wallets_102044 wallets SET balance_kobo = (balance_kobo OPERATOR(pg_catalog.-) '1000'::bigint), version = (version OPERATOR(pg_catalog.+) 1) WHERE (wallet_id OPERATOR(pg_catalog.=) '26'::bigint)
+    DETAIL:  on server kolaro@worker2:5432 connectionId: 1
+    NOTICE:  issuing UPDATE wallet.wallets_102044 wallets SET balance_kobo = (balance_kobo OPERATOR(pg_catalog.+) '1000'::bigint), version = (version OPERATOR(pg_catalog.+) 1) WHERE (wallet_id OPERATOR(pg_catalog.=) '101870'::bigint)
+    DETAIL:  on server kolaro@worker2:5432 connectionId: 1
+    NOTICE:  issuing INSERT INTO wallet.transfers_102108 (transfer_id, source_wallet_id, destination_wallet_id, amount_kobo, status, transaction_id, created_at) VALUES ('1538573'::bigint, '26'::bigint, '101870'::bigint, '1000'::bigint, 'completed'::text, '2078001'::bigint, '2026-11-10 08:56:13.346813+00'::timestamp with time zone)
+    DETAIL:  on server kolaro@worker2:5432 connectionId: 1
+    NOTICE:  issuing PREPARE TRANSACTION 'citus_0_938_38_0'
+    DETAIL:  on server kolaro@worker2:5432 connectionId: 1
+    NOTICE:  issuing PREPARE TRANSACTION 'citus_0_938_38_1'
+    DETAIL:  on server kolaro@worker1:5432 connectionId: 2
+    NOTICE:  issuing COMMIT PREPARED 'citus_0_938_38_0'
+    DETAIL:  on server kolaro@worker2:5432 connectionId: 1
+    NOTICE:  issuing COMMIT PREPARED 'citus_0_938_38_1'
+    DETAIL:  on server kolaro@worker1:5432 connectionId: 2
+     transfer_by_id 
+    ----------------
+     completed
+
+
+Both wallets are in one shard, yet 2 workers took part and the commit used PREPARE
+TRANSACTION: the ledger_transactions row is placed by its own transaction_id, and this
+one went to another worker. With that table sharded separately, almost every transfer
+needs two-phase commit. Adding the source wallet_id to ledger_transactions and
+co-locating it with wallets would keep a same-shard transfer on one worker.
+
+== S4.2 Wallets on different workers ==
+
+[coordinator] SELECT wallet_id, balance_kobo, nodename FROM wallet.wallet_placement WHERE wallet_id IN (9, 13) ORDER BY 1
+     wallet_id | balance_kobo | nodename 
+    -----------+--------------+----------
+             9 |     28676510 | worker1
+            13 |     15178883 | worker2
+
+
+[coordinator] SET citus.log_remote_commands = on;
+SELECT wallet.transfer_by_id(9, 13, 1000)
+    SET
+    NOTICE:  issuing BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;SELECT assign_distributed_transaction_id(0, 40, '2026-11-10 08:56:16.227736+00');
+    DETAIL:  on server kolaro@worker1:5432 connectionId: 1
+    NOTICE:  issuing SELECT 1 FROM wallet.wallets_102069 wallets WHERE (wallet_id OPERATOR(pg_catalog.=) '9'::bigint) FOR UPDATE OF wallets
+    DETAIL:  on server kolaro@worker1:5432 connectionId: 1
+    NOTICE:  issuing BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;SELECT assign_distributed_transaction_id(0, 40, '2026-11-10 08:56:16.227736+00');
+    DETAIL:  on server kolaro@worker2:5432 connectionId: 2
+    NOTICE:  issuing SELECT 1 FROM wallet.wallets_102064 wallets WHERE (wallet_id OPERATOR(pg_catalog.=) '13'::bigint) FOR UPDATE OF wallets
+    DETAIL:  on server kolaro@worker2:5432 connectionId: 2
+    NOTICE:  issuing SELECT balance_kobo, status FROM wallet.wallets_102069 wallets WHERE (wallet_id OPERATOR(pg_catalog.=) '9'::bigint)
+    DETAIL:  on server kolaro@worker1:5432 connectionId: 1
+    NOTICE:  issuing INSERT INTO wallet.ledger_transactions_102148 (transaction_id, txn_type, narration, created_at) VALUES ('2078002'::bigint, 'transfer'::text, 'Transfer'::text, '2026-11-10 08:56:16.197531+00'::timestamp with time zone) RETURNING transaction_id
+    DETAIL:  on server kolaro@worker2:5432 connectionId: 2
+    NOTICE:  issuing INSERT INTO wallet.ledger_entries_102101 (entry_id, transaction_id, wallet_id, amount_kobo, created_at) VALUES ('4156014'::bigint, '2078002'::bigint, '9'::bigint, '-1000'::bigint, '2026-11-10 08:56:16.197531+00'::timestamp with time zone)
+    DETAIL:  on server kolaro@worker1:5432 connectionId: 1
+    NOTICE:  issuing INSERT INTO wallet.ledger_entries_102096 (entry_id, transaction_id, wallet_id, amount_kobo, created_at) VALUES ('4156015'::bigint, '2078002'::bigint, '13'::bigint, '1000'::bigint, '2026-11-10 08:56:16.197531+00'::timestamp with time zone)
+    DETAIL:  on server kolaro@worker2:5432 connectionId: 2
+    NOTICE:  issuing UPDATE wallet.wallets_102069 wallets SET balance_kobo = (balance_kobo OPERATOR(pg_catalog.-) '1000'::bigint), version = (version OPERATOR(pg_catalog.+) 1) WHERE (wallet_id OPERATOR(pg_catalog.=) '9'::bigint)
+    DETAIL:  on server kolaro@worker1:5432 connectionId: 1
+    NOTICE:  issuing UPDATE wallet.wallets_102064 wallets SET balance_kobo = (balance_kobo OPERATOR(pg_catalog.+) '1000'::bigint), version = (version OPERATOR(pg_catalog.+) 1) WHERE (wallet_id OPERATOR(pg_catalog.=) '13'::bigint)
+    DETAIL:  on server kolaro@worker2:5432 connectionId: 2
+    NOTICE:  issuing INSERT INTO wallet.transfers_102133 (transfer_id, source_wallet_id, destination_wallet_id, amount_kobo, status, transaction_id, created_at) VALUES ('1538574'::bigint, '9'::bigint, '13'::bigint, '1000'::bigint, 'completed'::text, '2078002'::bigint, '2026-11-10 08:56:16.197531+00'::timestamp with time zone)
+    DETAIL:  on server kolaro@worker1:5432 connectionId: 1
+    NOTICE:  issuing PREPARE TRANSACTION 'citus_0_957_40_0'
+    DETAIL:  on server kolaro@worker1:5432 connectionId: 1
+    NOTICE:  issuing PREPARE TRANSACTION 'citus_0_957_40_1'
+    DETAIL:  on server kolaro@worker2:5432 connectionId: 2
+    NOTICE:  issuing COMMIT PREPARED 'citus_0_957_40_0'
+    DETAIL:  on server kolaro@worker1:5432 connectionId: 1
+    NOTICE:  issuing COMMIT PREPARED 'citus_0_957_40_1'
+    DETAIL:  on server kolaro@worker2:5432 connectionId: 2
+     transfer_by_id 
+    ----------------
+     completed
+
+
+PREPARE TRANSACTION asks each worker to make its part durable and promise it can commit.
+Only when every worker has prepared does the coordinator send COMMIT PREPARED. Citus
+records the decision in pg_dist_transaction, so if the coordinator fails in between, a
+recovery process can finish or roll back the prepared transactions.
+
+== S4.3 Atomicity across workers ==
+
+Credit the worker2 wallet first, then debit the worker1 wallet by more than it holds:
+
+[coordinator] BEGIN;
+UPDATE wallet.wallets SET balance_kobo = balance_kobo + 999999999999 WHERE wallet_id = 13;
+UPDATE wallet.wallets SET balance_kobo = balance_kobo - 999999999999 WHERE wallet_id = 9;
+COMMIT;
+    BEGIN
+    UPDATE 1
+    ERROR:  new row for relation "wallets_102069" violates check constraint "wallet_balance_not_negative"
+    DETAIL:  Failing row contains (9, 1100000001, customer, 7, null, null, NGN, -999971324489, active, 6272, 2025-07-25 08:53:39.796518+00).
+    CONTEXT:  while executing command on worker1:5432
+    ROLLBACK
+
+[coordinator] SELECT wallet_id, balance_kobo, nodename FROM wallet.wallet_placement WHERE wallet_id IN (9, 13) ORDER BY 1
+     wallet_id | balance_kobo | nodename 
+    -----------+--------------+----------
+             9 |     28675510 | worker1
+            13 |     15179883 | worker2
+
+
+Neither change was kept: the credit on worker2 was rolled back with the failed debit on worker1.
+
+== S4.4 How many real transfers would span shards? ==
+
+[coordinator] WITH oct AS MATERIALIZED (
+       SELECT source_wallet_id, destination_wallet_id FROM wallet.transfers
+        WHERE created_at >= '2026-10-01' AND created_at < '2026-11-01'),
+     placed AS (
+       SELECT s.shardid AS src_shard, d.shardid AS dst_shard, s.nodename AS src_node, d.nodename AS dst_node
+         FROM oct
+         JOIN wallet.wallet_placement s ON s.wallet_id = oct.source_wallet_id
+         JOIN wallet.wallet_placement d ON d.wallet_id = oct.destination_wallet_id)
+     SELECT count(*) AS october_transfers,
+            round(100.0 * count(*) FILTER (WHERE src_shard = dst_shard) / count(*), 1) AS pct_same_shard,
+            round(100.0 * count(*) FILTER (WHERE src_shard <> dst_shard AND src_node = dst_node) / count(*), 1) AS pct_same_worker,
+            round(100.0 * count(*) FILTER (WHERE src_node <> dst_node) / count(*), 1) AS pct_different_workers
+       FROM placed
+     october_transfers | pct_same_shard | pct_same_worker | pct_different_workers 
+    -------------------+----------------+-----------------+-----------------------
+                130751 |            3.1 |            47.1 |                  49.9
+
+
+
+== S4.5 Throughput: same-shard transfers compared with cross-worker transfers ==
+
+pgbench, 4 clients for 15 seconds each, transfers of 1 kobo between 200 wallet pairs of each
+kind. No wallet appears in more than one pair, so clients rarely wait for each other's locks.
+
+same_shard       291.8 transfers per second,    13.7 ms average latency
+cross_worker     200.4 transfers per second,    20.0 ms average latency
+
+[coordinator] SELECT count(*) AS prepared_transactions_left_over FROM pg_prepared_xacts
+     prepared_transactions_left_over 
+    ---------------------------------
+                                   0
+
+

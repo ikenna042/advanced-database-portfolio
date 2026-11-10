@@ -1,0 +1,192 @@
+
+== R6.1 node3 follows the new primary ==
+
+(docker network connect ... node3)
+
+[node2] SELECT slot_name FROM pg_create_physical_replication_slot('node3', true)
+           UNION ALL SELECT slot_name FROM pg_create_physical_replication_slot('node1', true)
+     slot_name 
+    -----------
+     node3
+     node1
+
+
+[node3] ALTER SYSTEM SET primary_conninfo = 'host=node2 user=replicator password=replicator-local-only'
+    ALTER SYSTEM
+
+[node3] ALTER SYSTEM SET primary_slot_name = 'node3'
+    ALTER SYSTEM
+
+[node3] SELECT pg_reload_conf()
+     pg_reload_conf 
+    ----------------
+     t
+
+
+[node3] SELECT sender_host, received_tli AS timeline, status FROM pg_stat_wal_receiver
+     sender_host | timeline |  status   
+    -------------+----------+-----------
+     node2       |        2 | streaming
+
+
+[node2] SELECT count(*) AS transfers, max(transfer_id) AS highest_id FROM wallet.transfers
+     transfers | highest_id 
+    -----------+------------
+         34053 |      34060
+
+
+[node3] SELECT count(*) AS transfers, max(transfer_id) AS highest_id FROM wallet.transfers
+     transfers | highest_id 
+    -----------+------------
+         34053 |      34060
+
+
+
+== R6.2 The old primary restarts: two primaries (split brain) ==
+
+(docker compose start node1)
+
+[node1] CHECKPOINT; SELECT current_setting('cluster_name') AS node, pg_is_in_recovery() AS is_standby, timeline_id FROM pg_control_checkpoint()
+    CHECKPOINT
+     node  | is_standby | timeline_id 
+    -------+------------+-------------
+     node1 | f          |           1
+
+
+[node2] CHECKPOINT; SELECT current_setting('cluster_name') AS node, pg_is_in_recovery() AS is_standby, timeline_id FROM pg_control_checkpoint()
+    CHECKPOINT
+     node  | is_standby | timeline_id 
+    -------+------------+-------------
+     node2 | f          |           2
+
+
+The application's connection string lists node1 first, and node1 accepts writes again:
+
+[app -> node1,node2,node3] SELECT current_setting('cluster_name') AS application_would_write_to
+     application_would_write_to 
+    ----------------------------
+     node1
+
+
+A transfer sent to node1 now waits for its synchronous standby (node2), which no longer
+follows it. After 3 seconds it is cancelled, which leaves it committed on node1 alone:
+
+[app -> node1] the transfer returned:
+    WARNING:  canceling wait for synchronous replication due to user request
+    DETAIL:  The transaction has already committed locally, but might not have been replicated to the standby.
+     transfer_id |  status   
+    -------------+-----------
+           34057 | completed
+
+
+[node1] SELECT current_setting('cluster_name') AS node, (SELECT count(*) FROM wallet.idempotency_keys WHERE idempotency_key = 'r6-split-brain') AS split_brain_transfer,
+                    (SELECT balance_kobo FROM wallet.wallets WHERE wallet_number = '3100000002') AS wallet_3100000002_kobo
+     node  | split_brain_transfer | wallet_3100000002_kobo 
+    -------+----------------------+------------------------
+     node1 |                    1 |                5450000
+
+
+[node2] SELECT current_setting('cluster_name') AS node, (SELECT count(*) FROM wallet.idempotency_keys WHERE idempotency_key = 'r6-split-brain') AS split_brain_transfer,
+                    (SELECT balance_kobo FROM wallet.wallets WHERE wallet_number = '3100000002') AS wallet_3100000002_kobo
+     node  | split_brain_transfer | wallet_3100000002_kobo 
+    -------+----------------------+------------------------
+     node2 |                    0 |                6150000
+
+
+
+== R6.3 Fencing node1 and rewinding it into a standby ==
+
+(docker compose stop node1)
+
+pg_rewind finds where node1's timeline split from node2's, and copies back from node2
+only the blocks that changed since then. node1's own changes after the split are discarded.
+
+    pg_rewind: connected to server
+    pg_rewind: servers diverged at WAL location 0/8E730D8 on timeline 1
+    pg_rewind: rewinding from last common checkpoint at 0/2000110 on timeline 1
+    pg_rewind: reading source file list
+    pg_rewind: reading target file list
+    pg_rewind: reading WAL in target
+    pg_rewind: need to copy 198 MB (total source directory size is 222 MB)
+    pg_rewind: creating backup label and updating control file
+    pg_rewind: syncing target data directory
+    pg_rewind: Done!
+
+[node1] SELECT current_setting('cluster_name') AS node, pg_is_in_recovery() AS is_standby
+     node  | is_standby 
+    -------+------------
+     node1 | t
+
+
+[node1] SELECT sender_host, received_tli AS timeline, status FROM pg_stat_wal_receiver
+     sender_host | timeline |  status   
+    -------------+----------+-----------
+     node2       |        2 | streaming
+
+
+[node1] SELECT current_setting('cluster_name') AS node, (SELECT count(*) FROM wallet.idempotency_keys WHERE idempotency_key = 'r6-split-brain') AS split_brain_transfer,
+                    (SELECT balance_kobo FROM wallet.wallets WHERE wallet_number = '3100000002') AS wallet_3100000002_kobo
+     node  | split_brain_transfer | wallet_3100000002_kobo 
+    -------+----------------------+------------------------
+     node1 |                    0 |                6150000
+
+
+
+== R6.4 The cluster after failover ==
+
+[node2] ALTER SYSTEM SET synchronous_standby_names = 'ANY 1 (node1, node3)'
+    ALTER SYSTEM
+
+[node2] SELECT pg_reload_conf()
+     pg_reload_conf 
+    ----------------
+     t
+
+
+[node2] SELECT application_name AS standby, state, sync_state,
+       pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) AS bytes_not_yet_applied
+  FROM pg_stat_replication ORDER BY 1
+     standby |   state   | sync_state | bytes_not_yet_applied 
+    ---------+-----------+------------+-----------------------
+     node1   | streaming | quorum     |                     0
+     node3   | streaming | quorum     |                     0
+
+
+Every node holds identical data, and the Portfolio 3 consistency rules still hold:
+
+[node1] SELECT current_setting('cluster_name') AS node,
+                 (SELECT count(*) FROM wallet.transfers) AS transfers,
+                 (SELECT md5(string_agg(transfer_id || status, ',' ORDER BY transfer_id)) FROM wallet.transfers) AS transfers_checksum,
+                 (SELECT sum(balance_kobo) FROM wallet.wallets WHERE wallet_number LIKE '30%') AS stress_wallets_kobo,
+                 (SELECT sum(balance_kobo) FROM wallet.wallets WHERE wallet_number LIKE '31%') AS demo_wallets_kobo,
+                 (SELECT count(*) FROM wallet.v_wallet_balance_audit WHERE difference_kobo <> 0) AS balance_mismatches,
+                 (SELECT count(*) FROM wallet.v_request_ledger_mismatches) AS request_mismatches
+     node  | transfers |        transfers_checksum        | stress_wallets_kobo | demo_wallets_kobo | balance_mismatches | request_mismatches 
+    -------+-----------+----------------------------------+---------------------+-------------------+--------------------+--------------------
+     node1 |     34053 | d4b09a2eb65f6e8cd1f3fbb47e40784e |            20000000 |          10000000 |                  0 |                  0
+
+
+[node2] SELECT current_setting('cluster_name') AS node,
+                 (SELECT count(*) FROM wallet.transfers) AS transfers,
+                 (SELECT md5(string_agg(transfer_id || status, ',' ORDER BY transfer_id)) FROM wallet.transfers) AS transfers_checksum,
+                 (SELECT sum(balance_kobo) FROM wallet.wallets WHERE wallet_number LIKE '30%') AS stress_wallets_kobo,
+                 (SELECT sum(balance_kobo) FROM wallet.wallets WHERE wallet_number LIKE '31%') AS demo_wallets_kobo,
+                 (SELECT count(*) FROM wallet.v_wallet_balance_audit WHERE difference_kobo <> 0) AS balance_mismatches,
+                 (SELECT count(*) FROM wallet.v_request_ledger_mismatches) AS request_mismatches
+     node  | transfers |        transfers_checksum        | stress_wallets_kobo | demo_wallets_kobo | balance_mismatches | request_mismatches 
+    -------+-----------+----------------------------------+---------------------+-------------------+--------------------+--------------------
+     node2 |     34053 | d4b09a2eb65f6e8cd1f3fbb47e40784e |            20000000 |          10000000 |                  0 |                  0
+
+
+[node3] SELECT current_setting('cluster_name') AS node,
+                 (SELECT count(*) FROM wallet.transfers) AS transfers,
+                 (SELECT md5(string_agg(transfer_id || status, ',' ORDER BY transfer_id)) FROM wallet.transfers) AS transfers_checksum,
+                 (SELECT sum(balance_kobo) FROM wallet.wallets WHERE wallet_number LIKE '30%') AS stress_wallets_kobo,
+                 (SELECT sum(balance_kobo) FROM wallet.wallets WHERE wallet_number LIKE '31%') AS demo_wallets_kobo,
+                 (SELECT count(*) FROM wallet.v_wallet_balance_audit WHERE difference_kobo <> 0) AS balance_mismatches,
+                 (SELECT count(*) FROM wallet.v_request_ledger_mismatches) AS request_mismatches
+     node  | transfers |        transfers_checksum        | stress_wallets_kobo | demo_wallets_kobo | balance_mismatches | request_mismatches 
+    -------+-----------+----------------------------------+---------------------+-------------------+--------------------+--------------------
+     node3 |     34053 | d4b09a2eb65f6e8cd1f3fbb47e40784e |            20000000 |          10000000 |                  0 |                  0
+
+

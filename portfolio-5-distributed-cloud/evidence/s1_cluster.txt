@@ -1,0 +1,102 @@
+
+== Cluster ==
+
+[coordinator] SELECT citus_version()
+                                         citus_version                                      
+    ----------------------------------------------------------------------------------------
+     Citus 12.1.6 on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14) 12.2.0, 64-bit
+
+
+[coordinator] SELECT nodename, groupid, noderole, shouldhaveshards FROM pg_dist_node ORDER BY nodeid
+      nodename   | groupid | noderole | shouldhaveshards 
+    -------------+---------+----------+------------------
+     coordinator |       0 | primary  | f
+     worker1     |       1 | primary  | t
+     worker2     |       2 | primary  | t
+
+
+
+== Loading (COPY through the coordinator, which routes each row to its shard) ==
+
+merchants                 2001 rows in   1 s
+customers               100003 rows in   5 s
+wallets                 102005 rows in   4 s
+ledger_transactions    2078000 rows in   8 s
+ledger_entries         4156000 rows in  28 s
+transfers              1538568 rows in  12 s
+
+
+== Tables: how each one is spread ==
+
+[coordinator] SELECT table_name, citus_table_type, distribution_column, colocation_id, shard_count, table_size
+       FROM citus_tables ORDER BY colocation_id, table_name
+             table_name         | citus_table_type | distribution_column | colocation_id | shard_count | table_size 
+    ----------------------------+------------------+---------------------+---------------+-------------+------------
+     wallet.merchants           | reference        | <none>              |             1 |           1 | 1080 kB
+     wallet.customers           | distributed      | customer_id         |             2 |          32 | 16 MB
+     wallet.wallets             | distributed      | wallet_id           |             3 |          32 | 16 MB
+     wallet.ledger_entries      | distributed      | wallet_id           |             3 |          32 | 768 MB
+     wallet.transfers           | distributed      | source_wallet_id    |             3 |          32 | 260 MB
+     wallet.ledger_transactions | distributed      | transaction_id      |             4 |          32 | 192 MB
+
+
+
+== Shards per worker (32 shards per distributed table) ==
+
+[coordinator] SELECT nodename, count(*) AS shards, count(DISTINCT colocation_id) AS shard_groups,
+       pg_size_pretty(sum(shard_size)) AS data
+  FROM citus_shards WHERE citus_table_type = 'distributed' GROUP BY nodename ORDER BY nodename
+     nodename | shards | shard_groups |  data  
+    ----------+--------+--------------+--------
+     worker1  |     80 |            3 | 580 MB
+     worker2  |     80 |            3 | 672 MB
+
+
+
+== Rows per worker for ledger_entries ==
+
+[coordinator] SELECT nodename, count(*) AS shards, sum(rows) AS ledger_entries
+       FROM (SELECT shardid, nodename, (result::bigint) AS rows
+               FROM run_command_on_shards('wallet.ledger_entries', 'SELECT count(*) FROM %s') r
+               JOIN citus_shards USING (shardid)) s
+      GROUP BY nodename ORDER BY nodename
+     nodename | shards | ledger_entries 
+    ----------+--------+----------------
+     worker1  |     16 |        1815670
+     worker2  |     16 |        2340330
+
+
+
+== The same totals as the single server ==
+
+[coordinator] SELECT (SELECT count(*) FROM wallet.ledger_entries) AS ledger_entries,
+       (SELECT sum(amount_kobo) FROM wallet.ledger_entries) AS ledger_net_kobo,
+       (SELECT sum(balance_kobo) FROM wallet.wallets) AS balances_kobo,
+       (SELECT count(*) FROM wallet.transfers) AS transfers
+     ledger_entries | ledger_net_kobo | balances_kobo | transfers 
+    ----------------+-----------------+---------------+-----------
+            4156000 |               0 |             0 |   1538568
+
+
+[single server] SELECT (SELECT count(*) FROM wallet.ledger_entries) AS ledger_entries,
+       (SELECT sum(amount_kobo) FROM wallet.ledger_entries) AS ledger_net_kobo,
+       (SELECT sum(balance_kobo) FROM wallet.wallets) AS balances_kobo,
+       (SELECT count(*) FROM wallet.transfers) AS transfers
+    Timing is on.
+     ledger_entries | ledger_net_kobo | balances_kobo | transfers 
+    ----------------+-----------------+---------------+-----------
+            4156000 |               0 |             0 |   1538568
+
+    Time: 1657.869 ms (00:01.658)
+
+
+== Uniqueness that does not include the shard key cannot be enforced ==
+
+[coordinator] ALTER TABLE wallet.customers ADD CONSTRAINT customers_phone_unique UNIQUE (phone)
+    ERROR:  cannot create constraint on "customers"
+    DETAIL:  Distributed relations cannot have UNIQUE, EXCLUDE, or PRIMARY KEY constraints that do not include the partition column (with an equality operator if EXCLUDE).
+
+[coordinator] ALTER TABLE wallet.wallets ADD CONSTRAINT wallets_number_unique UNIQUE (wallet_number)
+    ERROR:  cannot create constraint on "wallets"
+    DETAIL:  Distributed relations cannot have UNIQUE, EXCLUDE, or PRIMARY KEY constraints that do not include the partition column (with an equality operator if EXCLUDE).
+

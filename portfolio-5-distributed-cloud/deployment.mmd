@@ -1,0 +1,36 @@
+---
+config:
+  theme: neutral
+---
+flowchart LR
+    app["Kolaro app servers<br/>(several, in every zone)"]
+    pool["Connection pooler / router<br/>sends writes to the current primary"]
+    ha["Failover manager with a consensus store<br/>(for example Patroni + etcd, or a managed service)<br/>holds the leader lock, promotes, fences the old primary"]
+
+    subgraph regionA["Main cloud region"]
+        subgraph zA["Zone A"]
+            p["Primary<br/>all writes"]
+        end
+        subgraph zB["Zone B"]
+            s1["Standby 1<br/>synchronous (quorum)"]
+        end
+        subgraph zC["Zone C"]
+            s2["Standby 2<br/>synchronous (quorum)<br/>also serves reports"]
+        end
+    end
+
+    subgraph regionB["Second region (disaster recovery)"]
+        dr["Standby 3<br/>asynchronous"]
+        backup["Object storage<br/>base backups + WAL archive<br/>(point-in-time recovery)"]
+    end
+
+    app --> pool
+    pool -- "writes and balance reads" --> p
+    pool -. "statements and reports<br/>(may lag slightly)" .-> s2
+    p -- "WAL, quorum: commit<br/>waits for either" --> s1
+    p -- "WAL, quorum: commit<br/>waits for either" --> s2
+    p -- "WAL, not waited for" --> dr
+    p -- "archived WAL" --> backup
+    ha -. "health checks and promotion" .-> p
+    ha -.-> s1
+    ha -.-> s2

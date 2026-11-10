@@ -1,0 +1,77 @@
+# Portfolio 5 replication lab: three PostgreSQL 16 nodes and an application client.
+# node1 starts as the primary; node2 and node3 clone it with pg_basebackup and stream its WAL.
+# Roles change during the failover demo, so the nodes are named by number, not by role.
+# Ports are bound to localhost only and the passwords are for this local lab, not for real use.
+name: kolaro-p5-replication
+
+x-node: &node
+  image: postgres:16-alpine
+  entrypoint: ["/bin/sh", "/lab/node-entrypoint.sh"]
+  cap_add: [NET_ADMIN]  # lets run.sh add network delay with tc netem
+  environment:
+    POSTGRES_DB: kolaro
+    POSTGRES_USER: kolaro
+    POSTGRES_PASSWORD: kolaro-local-only
+    REPLICATION_PASSWORD: replicator-local-only
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U kolaro -d kolaro"]
+    interval: 2s
+    timeout: 3s
+    retries: 60
+
+services:
+  node1:
+    <<: *node
+    hostname: node1
+    networks: { default: { ipv4_address: 172.28.50.11 } }
+    command: node1
+    ports: ["127.0.0.1:5441:5432"]
+    volumes:
+      - node1-data:/var/lib/postgresql/data
+      - ./node-entrypoint.sh:/lab/node-entrypoint.sh:ro
+      - ./init-primary.sh:/docker-entrypoint-initdb.d/init-primary.sh:ro
+
+  node2:
+    <<: *node
+    hostname: node2
+    networks: { default: { ipv4_address: 172.28.50.12 } }
+    command: node2
+    ports: ["127.0.0.1:5442:5432"]
+    depends_on: { node1: { condition: service_healthy } }
+    volumes:
+      - node2-data:/var/lib/postgresql/data
+      - ./node-entrypoint.sh:/lab/node-entrypoint.sh:ro
+
+  node3:
+    <<: *node
+    hostname: node3
+    networks: { default: { ipv4_address: 172.28.50.13 } }
+    command: node3
+    ports: ["127.0.0.1:5443:5432"]
+    depends_on: { node1: { condition: service_healthy } }
+    volumes:
+      - node3-data:/var/lib/postgresql/data
+      - ./node-entrypoint.sh:/lab/node-entrypoint.sh:ro
+
+  # Plays the part of the Kolaro application servers: runs pgbench and app.sh.
+  client:
+    image: postgres:16-alpine
+    entrypoint: ["sleep", "infinity"]
+    environment:
+      PGPASSWORD: kolaro-local-only
+    volumes:
+      - ./app.sh:/lab/app.sh:ro
+      - ../../portfolio-3-transactions-concurrency/stress/safe.pgbench:/lab/safe.pgbench:ro
+
+# Fixed addresses let the application and the failure check connect without a DNS lookup.
+# Docker's DNS can take seconds to report that a dead container's name no longer exists,
+# which would hide the database's own timeouts.
+networks:
+  default:
+    ipam:
+      config: [{ subnet: 172.28.50.0/24 }]
+
+volumes:
+  node1-data:
+  node2-data:
+  node3-data:

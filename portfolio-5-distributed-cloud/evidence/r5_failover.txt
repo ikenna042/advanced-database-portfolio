@@ -1,0 +1,91 @@
+
+== R5.1 Starting position ==
+
+node3 is disconnected from the network first, so it falls behind the way a distant
+asynchronous replica can. node2 stays the synchronous standby.
+
+(docker network disconnect ... node3)
+
+[node1] SELECT application_name AS standby, state, sync_state,
+       pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) AS bytes_not_yet_applied
+  FROM pg_stat_replication ORDER BY 1
+     standby |   state   | sync_state | bytes_not_yet_applied 
+    ---------+-----------+------------+-----------------------
+     node2   | streaming | sync       |                     0
+     node3   | streaming | async      |                519776
+
+
+
+== R5.2 node1 is killed ==
+
+(docker compose kill node1, SIGKILL, at uptime 35876.21 s)
+
+Failure detection: check node1 once a second; declare it failed after 3 misses in a row.
+Each check is pg_isready with a 1-second timeout. The times are seconds since the kill.
+
+    check finished at +2.38 s: 172.28.50.11:5432 - no response
+    check finished at +5.40 s: 172.28.50.11:5432 - no response
+    check finished at +8.42 s: 172.28.50.11:5432 - no response
+node1 declared failed.
+
+[node2] SELECT pg_promote()
+    promotion finished
+
+[node2] CHECKPOINT; SELECT pg_is_in_recovery() AS still_standby, timeline_id FROM pg_control_checkpoint()
+    CHECKPOINT
+     still_standby | timeline_id 
+    ---------------+-------------
+     f             |           2
+
+
+node2's log around the promotion:
+    LOG:  received promote request
+    LOG:  selected new timeline ID: 2
+    LOG:  archive recovery complete
+    LOG:  database system is ready to accept connections
+
+
+== R5.3 What the application saw ==
+
+   264 transfers confirmed by node1
+     4 transfers confirmed by node2
+0 transfers were confirmed as replayed (retried after committing)
+3 failed attempts, each retried with the same idempotency key. By error, in order:
+      1 x  +0.10 to +0.10 s  psql: error: connection to server at "172.28.50.11", port 5432 failed: FATAL: terminating connection due to unexpected postmaster exit
+      2 x  +4.25 to +8.43 s  psql: error: connection to server at "172.28.50.11", port 5432 failed: timeout expired
+
+Last confirmation from node1:        +0.09 s from the kill
+node1 declared failed:               +9.70 s
+node2 promoted:                      +10.26 s
+First confirmation from node2:       +10.64 s   <- recovery time (RTO) for the application
+
+== R5.4 Was any confirmed transfer lost? (recovery point, RPO) ==
+
+Every transfer node1 confirmed before it died (their ids are passed in as :'ids'),
+looked up on the other nodes:
+
+[node2] SELECT count(*) AS confirmed_by_node1, count(*) FILTER (WHERE t.transfer_id IS NULL) AS missing_here
+                 FROM unnest(:'ids'::bigint[]) AS a(id) LEFT JOIN wallet.transfers t ON t.transfer_id = a.id
+     confirmed_by_node1 | missing_here 
+    --------------------+--------------
+                    264 |            0
+
+
+node3 is still a standby on the old timeline, and still disconnected, so it shows what would
+have been lost if it had been promoted instead:
+
+[node3] SELECT count(*) AS confirmed_by_node1, count(*) FILTER (WHERE t.transfer_id IS NULL) AS missing_here
+                 FROM unnest(:'ids'::bigint[]) AS a(id) LEFT JOIN wallet.transfers t ON t.transfer_id = a.id
+     confirmed_by_node1 | missing_here 
+    --------------------+--------------
+                    264 |          264
+
+
+[node3] SELECT pg_last_wal_replay_lsn() AS node3_applied_up_to, now() - pg_last_xact_replay_timestamp() AS behind_by
+     node3_applied_up_to |   behind_by   
+    ---------------------+---------------
+     0/8DEED50           | 00:00:33.3491
+
+
+Last transfer_id from node1: 34049. First from node2: 34057. Sequences are logged in batches of 32
+values, so a promoted standby skips the rest of the batch: ids have gaps but are never reused.
